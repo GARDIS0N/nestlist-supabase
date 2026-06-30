@@ -1,0 +1,537 @@
+import React, { useState, useEffect } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
+import { supabase } from "../lib/supabase";
+import { Search, MapPin, Heart, ListFilter, SlidersHorizontal, Grid, X, Info } from "lucide-react";
+
+const COUNTIES = ["All Counties", "Nairobi", "Kiambu", "Mombasa", "Kisumu", "Nakuru"];
+
+const TYPES = [
+  { value: "all", label: "All Types" },
+  { value: "single_room", label: "Single Room" },
+  { value: "bedsitter", label: "Bedsitter" },
+  { value: "studio", label: "Studio" },
+  { value: "1br", label: "1 Bedroom" },
+  { value: "2br", label: "2 Bedroom" },
+  { value: "3br", label: "3 Bedroom" },
+  { value: "4br", label: "4 Bedroom" },
+  { value: "5br_plus", label: "5 Bedroom+" }
+];
+
+const AMENITIES_LIST = [
+  "Water 24/7", "Borehole", "Parking", "Security Guard", "CCTV",
+  "Electric Fence", "Backup Generator", "WiFi Ready", "DSTV Ready",
+  "Tiled Floors", "Servant Quarter", "Garden", "Balcony",
+  "Near Tarmac", "Near School", "Near Shopping Centre"
+];
+
+export const Browse: React.FC = () => {
+  const { profile } = useAuth();
+  const navigate = useNavigate();
+
+  const [properties, setProperties] = useState<any[]>([]);
+  const [savedPropertyIds, setSavedPropertyIds] = useState<Set<string>>(new Set());
+  const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [page, setPage] = useState(0);
+  const [hasMore, setHasMore] = useState(true);
+
+  // Filters State
+  const [search, setSearch] = useState("");
+  const [selectedCounty, setSelectedCounty] = useState("All Counties");
+  const [selectedType, setSelectedType] = useState("all");
+  const [minPrice, setMinPrice] = useState("");
+  const [maxPrice, setMaxPrice] = useState("");
+  const [selectedAmenities, setSelectedAmenities] = useState<string[]>([]);
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
+
+  const ITEMS_PER_PAGE = 20;
+
+  // Fetch properties
+  const fetchProperties = async (pageNum: number = 0, isAppend: boolean = false) => {
+    if (pageNum === 0) setLoading(true);
+    else setLoadingMore(true);
+
+    try {
+      let query = supabase
+        .from("properties")
+        .select("*", { count: "exact" })
+        .eq("is_active", true);
+
+      // Apply Filters
+      if (selectedCounty !== "All Counties") {
+        query = query.eq("county", selectedCounty);
+      }
+      if (selectedType !== "all") {
+        query = query.eq("type", selectedType);
+      }
+      if (minPrice) {
+        query = query.gte("price", parseFloat(minPrice));
+      }
+      if (maxPrice) {
+        query = query.lte("price", parseFloat(maxPrice));
+      }
+
+      // Order and Paginate
+      const from = pageNum * ITEMS_PER_PAGE;
+      const to = from + ITEMS_PER_PAGE - 1;
+
+      const { data, count, error } = await query
+        .order("created_at", { ascending: false })
+        .range(from, to);
+
+      if (error) throw error;
+
+      let filteredData = data || [];
+
+      // Filter by text search (done client-side or with search query for maximum precision)
+      if (search.trim()) {
+        const keyword = search.toLowerCase();
+        filteredData = filteredData.filter(
+          (p: any) =>
+            p.title.toLowerCase().includes(keyword) ||
+            p.location.toLowerCase().includes(keyword) ||
+            (p.description && p.description.toLowerCase().includes(keyword))
+        );
+      }
+
+      // Filter by selected amenities (ensure all selected amenities are in property amenities list)
+      if (selectedAmenities.length > 0) {
+        filteredData = filteredData.filter((p: any) =>
+          selectedAmenities.every((amenity) => p.amenities?.includes(amenity))
+        );
+      }
+
+      if (isAppend) {
+        setProperties(prev => [...prev, ...filteredData]);
+      } else {
+        setProperties(filteredData);
+      }
+
+      // Check if there are more items to fetch
+      if (count) {
+        setHasMore(from + filteredData.length < count);
+      } else {
+        setHasMore(filteredData.length === ITEMS_PER_PAGE);
+      }
+    } catch (error) {
+      console.error("Error fetching properties:", error);
+    } finally {
+      setLoading(false);
+      setLoadingMore(false);
+    }
+  };
+
+  // Fetch saved property IDs for current tenant
+  const fetchSavedPropertyIds = async () => {
+    if (!profile || profile.role !== "tenant") return;
+
+    try {
+      const { data, error } = await supabase
+        .from("saved_properties")
+        .select("property_id")
+        .eq("tenant_id", profile.id);
+
+      if (error) throw error;
+
+      const ids = new Set(data.map((row: any) => row.property_id));
+      setSavedPropertyIds(ids);
+    } catch (err) {
+      console.error("Error loading saved property IDs:", err);
+    }
+  };
+
+  useEffect(() => {
+    setPage(0);
+    fetchProperties(0, false);
+  }, [search, selectedCounty, selectedType, minPrice, maxPrice, selectedAmenities]);
+
+  useEffect(() => {
+    fetchSavedPropertyIds();
+  }, [profile]);
+
+  const loadMore = () => {
+    const nextPage = page + 1;
+    setPage(nextPage);
+    fetchProperties(nextPage, true);
+  };
+
+  const toggleSaveProperty = async (e: React.MouseEvent, propertyId: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    if (!profile) {
+      navigate("/login");
+      return;
+    }
+
+    if (profile.role !== "tenant") {
+      alert("Only registered tenants can save properties to favorites.");
+      return;
+    }
+
+    const isSaved = savedPropertyIds.has(propertyId);
+    const updatedIds = new Set(savedPropertyIds);
+
+    try {
+      if (isSaved) {
+        // Delete from saved_properties
+        const { error } = await supabase
+          .from("saved_properties")
+          .delete()
+          .eq("tenant_id", profile.id)
+          .eq("property_id", propertyId);
+
+        if (error) throw error;
+        updatedIds.delete(propertyId);
+      } else {
+        // Insert into saved_properties
+        const { error } = await supabase
+          .from("saved_properties")
+          .insert({
+            tenant_id: profile.id,
+            property_id: propertyId,
+          });
+
+        if (error) throw error;
+        updatedIds.add(propertyId);
+      }
+
+      setSavedPropertyIds(updatedIds);
+    } catch (err: any) {
+      console.error("Failed to toggle saved status:", err);
+      alert(`Operation failed: ${err.message}`);
+    }
+  };
+
+  const toggleAmenity = (amenity: string) => {
+    setSelectedAmenities(prev =>
+      prev.includes(amenity)
+        ? prev.filter(a => a !== amenity)
+        : [...prev, amenity]
+    );
+  };
+
+  const clearFilters = () => {
+    setSearch("");
+    setSelectedCounty("All Counties");
+    setSelectedType("all");
+    setMinPrice("");
+    setMaxPrice("");
+    setSelectedAmenities([]);
+  };
+
+  const getPropertyTypeLabel = (typeKey: string) => {
+    return TYPES.find(t => t.value === typeKey)?.label || typeKey;
+  };
+
+  return (
+    <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 space-y-6">
+      
+      {/* Search Header Banner */}
+      <div className="bg-gradient-to-br from-stone-900 to-amber-950 text-white rounded-2xl p-6 sm:p-10 shadow-lg relative overflow-hidden">
+        <div className="absolute top-0 right-0 w-64 h-64 bg-amber-500/10 rounded-full blur-2xl"></div>
+        <div className="absolute -bottom-10 -left-10 w-48 h-48 bg-emerald-500/5 rounded-full blur-xl"></div>
+
+        <div className="max-w-2xl space-y-3 relative z-10">
+          <span className="bg-amber-600/30 text-amber-400 border border-amber-500/20 text-xs font-bold uppercase tracking-widest px-3 py-1 rounded-full">
+            Nyumba Popote Kenya
+          </span>
+          <h1 className="text-2xl sm:text-4xl font-extrabold tracking-tight font-sans">
+            Find Your Next Perfect Home
+          </h1>
+          <p className="text-xs sm:text-base text-stone-300 leading-relaxed max-w-xl">
+            Browse active rentals in Nairobi, Kiambu, Mombasa, Kisumu, and Nakuru. Landlords are fully verified with M-Pesa.
+          </p>
+        </div>
+
+        {/* Floating Fast Search Panel */}
+        <div className="mt-8 bg-white text-stone-800 p-3 rounded-xl border border-stone-200 shadow-xl flex flex-col md:flex-row gap-2 relative z-10 max-w-4xl">
+          <div className="flex-1 relative">
+            <Search className="absolute left-3 top-3 h-5 w-5 text-stone-400" />
+            <input
+              type="text"
+              placeholder="Search estates, keywords e.g. TRM, Kilimani..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full pl-10 pr-4 py-2.5 rounded-lg border-0 focus:outline-none focus:ring-0 text-sm"
+            />
+          </div>
+          
+          <div className="h-px md:h-10 w-full md:w-px bg-stone-200"></div>
+
+          {/* County Selector */}
+          <div className="w-full md:w-48 relative">
+            <MapPin className="absolute left-3 top-3 h-5 w-5 text-stone-400" />
+            <select
+              value={selectedCounty}
+              onChange={(e) => setSelectedCounty(e.target.value)}
+              className="w-full pl-10 pr-4 py-2.5 bg-transparent border-0 rounded-lg text-sm font-medium focus:outline-none focus:ring-0 cursor-pointer appearance-none"
+            >
+              {COUNTIES.map((county, i) => (
+                <option key={i} value={county}>{county}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="h-px md:h-10 w-full md:w-px bg-stone-200"></div>
+
+          {/* Type Selector */}
+          <div className="w-full md:w-48 relative">
+            <Grid className="absolute left-3 top-3 h-5 w-5 text-stone-400" />
+            <select
+              value={selectedType}
+              onChange={(e) => setSelectedType(e.target.value)}
+              className="w-full pl-10 pr-4 py-2.5 bg-transparent border-0 rounded-lg text-sm font-medium focus:outline-none focus:ring-0 cursor-pointer appearance-none"
+            >
+              {TYPES.map((type, i) => (
+                <option key={i} value={type.value}>{type.label}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="flex gap-2">
+            <button
+              onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
+              className="py-2.5 px-4 rounded-lg border border-stone-200 hover:bg-stone-50 text-stone-600 transition flex items-center justify-center space-x-1.5 text-sm"
+              title="Advanced Filters"
+            >
+              <SlidersHorizontal className="h-4 w-4" />
+              <span className="hidden sm:inline">Filters</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Advanced Filters Drawer (Collapse view) */}
+      {showAdvancedFilters && (
+        <div className="bg-white rounded-xl border border-stone-200 p-6 shadow-md space-y-6">
+          <div className="flex items-center justify-between border-b border-stone-100 pb-3">
+            <h3 className="font-semibold text-stone-900 text-base flex items-center space-x-2">
+              <ListFilter className="h-5 w-5 text-amber-600" />
+              <span>Filter Specifications</span>
+            </h3>
+            <button
+              onClick={clearFilters}
+              className="text-xs font-semibold text-amber-700 hover:text-amber-800"
+            >
+              Clear All
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Price Filter range */}
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-stone-700 uppercase tracking-wider block">
+                Budget (KSh / Month)
+              </label>
+              <div className="flex items-center space-x-3">
+                <input
+                  type="number"
+                  placeholder="Min KSh"
+                  value={minPrice}
+                  onChange={(e) => setMinPrice(e.target.value)}
+                  className="w-full border border-stone-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
+                />
+                <span className="text-stone-400 font-bold">to</span>
+                <input
+                  type="number"
+                  placeholder="Max KSh"
+                  value={maxPrice}
+                  onChange={(e) => setMaxPrice(e.target.value)}
+                  className="w-full border border-stone-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
+                />
+              </div>
+            </div>
+
+            {/* Quick Amenities summary */}
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-stone-700 uppercase tracking-wider block">
+                Must-Have Amenities
+              </label>
+              <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto p-1 border border-stone-200 rounded-xl">
+                {AMENITIES_LIST.map((amenity, idx) => {
+                  const isChecked = selectedAmenities.includes(amenity);
+                  return (
+                    <button
+                      key={idx}
+                      onClick={() => toggleAmenity(amenity)}
+                      className={`px-3 py-1 text-xs font-semibold rounded-lg border transition ${
+                        isChecked
+                          ? "bg-amber-100 border-amber-300 text-amber-900"
+                          : "bg-white border-stone-200 text-stone-600 hover:border-stone-300"
+                      }`}
+                    >
+                      {amenity}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Main Grid View */}
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <p className="text-sm font-semibold text-stone-500">
+            Showing <span className="text-stone-900">{properties.length}</span> verified listings
+          </p>
+        </div>
+
+        {loading ? (
+          /* LOADING PLACEHOLDERS */
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            {[1, 2, 3, 4, 5, 6].map((i) => (
+              <div key={i} className="bg-white rounded-2xl border border-stone-200 overflow-hidden space-y-4 animate-pulse">
+                <div className="bg-stone-200 aspect-video w-full"></div>
+                <div className="p-5 space-y-3">
+                  <div className="h-4 bg-stone-200 rounded w-1/3"></div>
+                  <div className="h-6 bg-stone-200 rounded w-3/4"></div>
+                  <div className="h-4 bg-stone-200 rounded w-1/2"></div>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : properties.length === 0 ? (
+          /* EMPTY STATE */
+          <div className="bg-white rounded-2xl border border-stone-200 py-16 px-4 text-center max-w-xl mx-auto">
+            <div className="text-4xl mb-3">🏡</div>
+            <h3 className="font-bold text-lg text-stone-900">No properties match your filters</h3>
+            <p className="text-stone-500 text-sm mt-1 max-w-md mx-auto leading-relaxed">
+              We couldn't find any active rental listings in this range. Try clearing your search keyword, adjusting your budget bounds, or subscribing for search alerts to get notified by SMS when matches are listed!
+            </p>
+            {profile?.role === "tenant" && (
+              <Link
+                to="/alerts"
+                className="mt-6 inline-flex items-center space-x-1.5 py-2.5 px-4 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-sm font-bold shadow-sm transition"
+              >
+                <span>Setup Search Alert</span>
+              </Link>
+            )}
+          </div>
+        ) : (
+          /* REAL PROPERTIES GRID */
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            {properties.map((property) => {
+              const isSaved = savedPropertyIds.has(property.id);
+              const coverImage = property.images?.[0] || "https://images.unsplash.com/photo-1522771739844-6a9f6d5f14af?auto=format&fit=crop&w=600&q=80";
+
+              return (
+                <Link
+                  key={property.id}
+                  to={`/property/${property.id}`}
+                  className="group bg-white rounded-2xl border border-stone-200/80 overflow-hidden hover:shadow-xl hover:border-amber-200 transition-all duration-300 flex flex-col h-full"
+                >
+                  {/* Photo Container */}
+                  <div className="relative aspect-video w-full overflow-hidden bg-stone-100">
+                    <img
+                      src={coverImage}
+                      alt={property.title}
+                      className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                      referrerPolicy="no-referrer"
+                    />
+
+                    {/* Badge: Rent Type */}
+                    <span className="absolute top-3 left-3 bg-stone-900/80 backdrop-blur-sm text-amber-400 text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full border border-stone-700">
+                      {getPropertyTypeLabel(property.type)}
+                    </span>
+
+                    {/* Badge: Verification Status */}
+                    <span className="absolute top-3 right-3 bg-emerald-600 text-white text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full shadow-sm flex items-center space-x-1">
+                      <span className="h-1.5 w-1.5 rounded-full bg-white animate-pulse"></span>
+                      <span>Verified</span>
+                    </span>
+
+                    {/* Heart button for tenants */}
+                    {(!profile || profile.role === "tenant") && (
+                      <button
+                        onClick={(e) => toggleSaveProperty(e, property.id)}
+                        className={`absolute bottom-3 right-3 p-2.5 rounded-full backdrop-blur-md border shadow-md transition-all duration-200 ${
+                          isSaved
+                            ? "bg-rose-50 border-rose-200 text-rose-500 hover:bg-rose-100 scale-110"
+                            : "bg-white/80 border-stone-200 text-stone-500 hover:text-rose-500 hover:bg-white"
+                        }`}
+                        title={isSaved ? "Remove from saved" : "Save property"}
+                      >
+                        <Heart className={`h-4.5 w-4.5 ${isSaved ? "fill-current" : ""}`} />
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Body Details */}
+                  <div className="p-5 flex flex-col flex-1 space-y-3">
+                    <div className="flex items-center space-x-1.5 text-stone-400 text-xs font-semibold">
+                      <MapPin className="h-3.5 w-3.5 text-amber-600 shrink-0" />
+                      <span className="truncate">{property.location}, {property.county}</span>
+                    </div>
+
+                    <h3 className="font-sans font-bold text-stone-950 text-base line-clamp-1 group-hover:text-amber-800 transition-colors">
+                      {property.title}
+                    </h3>
+
+                    <p className="text-xs text-stone-500 line-clamp-2 leading-relaxed">
+                      {property.description}
+                    </p>
+
+                    {/* Key Amenities tags */}
+                    {property.amenities && property.amenities.length > 0 && (
+                      <div className="flex flex-wrap gap-1 pt-1.5">
+                        {property.amenities.slice(0, 3).map((amenity: string, i: number) => (
+                          <span
+                            key={i}
+                            className="bg-stone-100 text-stone-600 text-[10px] font-semibold px-2 py-0.5 rounded"
+                          >
+                            {amenity}
+                          </span>
+                        ))}
+                        {property.amenities.length > 3 && (
+                          <span className="bg-stone-50 text-stone-400 text-[9px] font-bold px-1.5 py-0.5 rounded">
+                            +{property.amenities.length - 3} more
+                          </span>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Price and Action Footer */}
+                    <div className="pt-3 border-t border-stone-100 mt-auto flex items-baseline justify-between">
+                      <div>
+                        <span className="text-lg font-extrabold text-stone-950">
+                          KSh {parseFloat(property.price).toLocaleString()}
+                        </span>
+                        <span className="text-xs text-stone-500 font-medium"> / Month</span>
+                      </div>
+                      <span className="text-xs font-bold text-amber-700 group-hover:underline flex items-center space-x-0.5">
+                        <span>View Details</span>
+                        <span>→</span>
+                      </span>
+                    </div>
+                  </div>
+                </Link>
+              );
+            })}
+          </div>
+        )}
+
+        {/* PAGINATION LOAD MORE */}
+        {hasMore && !loading && (
+          <div className="flex justify-center pt-8">
+            <button
+              onClick={loadMore}
+              disabled={loadingMore}
+              className="flex items-center space-x-2 py-3 px-6 rounded-xl border border-stone-300 bg-white text-sm font-semibold text-stone-700 hover:bg-stone-50 shadow-sm transition disabled:opacity-50"
+            >
+              {loadingMore ? (
+                <div className="h-5 w-5 border-2 border-stone-600 border-t-transparent rounded-full animate-spin"></div>
+              ) : (
+                <span>Load More Rentals</span>
+              )}
+            </button>
+          </div>
+        )}
+
+      </div>
+    </div>
+  );
+};
