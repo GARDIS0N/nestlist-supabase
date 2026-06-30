@@ -1,8 +1,9 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { LogIn, KeyRound, Mail, AlertCircle, Sparkles } from "lucide-react";
 import { SupabaseConfigPanel } from "../components/SupabaseConfigPanel";
+import { supabase } from "../lib/supabase";
 
 export const Login: React.FC = () => {
   const { signIn, signInWithGoogle, resetPassword } = useAuth();
@@ -14,12 +15,26 @@ export const Login: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Email verification status state
+  const [isEmailNotConfirmed, setIsEmailNotConfirmed] = useState(false);
+  const [resendStatus, setResendStatus] = useState<"idle" | "sending" | "success" | "error">("idle");
+  const [resendCountdown, setResendCountdown] = useState(0);
+
   // Password reset state
   const [resetting, setResetting] = useState(false);
   const [resetSent, setResetSent] = useState(false);
   const [resetEmail, setResetEmail] = useState("");
 
   const redirectPath = location.state?.from?.pathname || "/";
+
+  // Countdown timer for email resending
+  useEffect(() => {
+    if (resendCountdown <= 0) return;
+    const timer = setInterval(() => {
+      setResendCountdown((prev) => prev - 1);
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [resendCountdown]);
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -30,14 +45,47 @@ export const Login: React.FC = () => {
 
     setLoading(true);
     setError(null);
+    setIsEmailNotConfirmed(false);
+    setResendStatus("idle");
 
     const { data, error: err } = await signIn(email, password);
 
     if (err) {
-      setError(err.message || "Invalid login credentials.");
+      const errMsg = err.message || "";
+      if (
+        errMsg.toLowerCase().includes("email not confirmed") ||
+        errMsg.toLowerCase().includes("email_not_confirmed") ||
+        errMsg.toLowerCase().includes("confirm your email")
+      ) {
+        setIsEmailNotConfirmed(true);
+      } else {
+        setError(errMsg || "Invalid login credentials.");
+      }
       setLoading(false);
     } else {
       navigate(redirectPath, { replace: true });
+    }
+  };
+
+  const handleResendConfirmation = async () => {
+    if (resendCountdown > 0) return;
+    setResendStatus("sending");
+    try {
+      const { error: resendErr } = await supabase.auth.resend({
+        type: "signup",
+        email: email,
+      });
+
+      if (resendErr) {
+        console.error("Resend confirmation failed:", resendErr);
+        setResendStatus("error");
+      } else {
+        setResendStatus("success");
+        setResendCountdown(30);
+      }
+    } catch (e) {
+      console.error("Resend confirmation failed with exception:", e);
+      setResendStatus("error");
     }
   };
 
@@ -95,12 +143,55 @@ export const Login: React.FC = () => {
           </p>
         </div>
 
-        {error && (
+        {isEmailNotConfirmed ? (
+          <div className="rounded-xl bg-amber-50 p-4 border border-amber-200 flex flex-col space-y-3 text-amber-900 text-xs sm:text-sm font-medium">
+            <div className="flex items-start space-x-3">
+              <AlertCircle className="h-5 w-5 text-amber-500 shrink-0 mt-0.5" />
+              <div className="space-y-1">
+                <p className="font-bold text-amber-950">Email confirmation pending</p>
+                <p className="text-amber-800 leading-relaxed">
+                  Your email <span className="font-semibold text-stone-900 break-all">{email}</span> hasn't been confirmed yet. Check your inbox (and spam folder) for the confirmation link.
+                </p>
+              </div>
+            </div>
+            
+            <div className="pl-8 flex flex-col sm:flex-row sm:items-center gap-2">
+              <button
+                type="button"
+                onClick={handleResendConfirmation}
+                disabled={resendStatus === "sending" || resendCountdown > 0}
+                className="text-xs font-bold text-amber-700 hover:text-amber-800 underline disabled:text-stone-400 disabled:no-underline flex items-center gap-1.5 transition text-left"
+              >
+                {resendStatus === "sending" ? (
+                  <>
+                    <div className="h-3 w-3 border-2 border-amber-700 border-t-transparent rounded-full animate-spin"></div>
+                    <span>Resending...</span>
+                  </>
+                ) : resendCountdown > 0 ? (
+                  <span>Resend available in {resendCountdown}s</span>
+                ) : (
+                  <span>Resend confirmation email</span>
+                )}
+              </button>
+              
+              {resendStatus === "success" && (
+                <span className="text-xs font-bold text-emerald-600 sm:border-l sm:pl-2 border-amber-200">
+                  Confirmation email resent — check your inbox.
+                </span>
+              )}
+              {resendStatus === "error" && (
+                <span className="text-xs font-bold text-red-600 sm:border-l sm:pl-2 border-amber-200">
+                  Could not resend email. Try again shortly.
+                </span>
+              )}
+            </div>
+          </div>
+        ) : error ? (
           <div className="rounded-xl bg-red-50 p-4 border border-red-100 flex items-start space-x-3 text-red-700 text-xs sm:text-sm">
             <AlertCircle className="h-5 w-5 text-red-500 shrink-0" />
             <p className="font-medium leading-relaxed">{error}</p>
           </div>
-        )}
+        ) : null}
 
         {/* RESET PASSWORD MODAL / FORM VIEW */}
         {resetting ? (

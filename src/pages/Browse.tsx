@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import { supabase } from "../lib/supabase";
-import { Search, MapPin, Heart, ListFilter, SlidersHorizontal, Grid, X, Info } from "lucide-react";
+import { supabase, INITIAL_PROPERTIES, getSupabaseConfig } from "../lib/supabase";
+import { Search, MapPin, Heart, ListFilter, SlidersHorizontal, Grid, X, Info, AlertTriangle, Database } from "lucide-react";
 
 const COUNTIES = ["All Counties", "Nairobi", "Kiambu", "Mombasa", "Kisumu", "Nakuru"];
 
@@ -34,7 +34,9 @@ export const Browse: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [page, setPage] = useState(0);
-  const [hasMore, setHasMore] = useState(true);
+  const [hasMore, setPageHasMore] = useState(true);
+  const [dbError, setDbError] = useState<string | null>(null);
+  const [usingFallback, setUsingFallback] = useState(false);
 
   // Filters State
   const [search, setSearch] = useState("");
@@ -53,6 +55,9 @@ export const Browse: React.FC = () => {
     else setLoadingMore(true);
 
     try {
+      setDbError(null);
+      setUsingFallback(false);
+
       let query = supabase
         .from("properties")
         .select("*", { count: "exact" })
@@ -110,12 +115,59 @@ export const Browse: React.FC = () => {
 
       // Check if there are more items to fetch
       if (count) {
-        setHasMore(from + filteredData.length < count);
+        setPageHasMore(from + filteredData.length < count);
       } else {
-        setHasMore(filteredData.length === ITEMS_PER_PAGE);
+        setPageHasMore(filteredData.length === ITEMS_PER_PAGE);
       }
-    } catch (error) {
-      console.error("Error fetching properties:", error);
+    } catch (error: any) {
+      console.warn("Error fetching properties from Supabase (using mock fallback):", error);
+      
+      // Mark fallback state and describe error
+      setUsingFallback(true);
+      if (error.message && (error.message.includes("relation") || error.message.includes("does not exist") || error.code === "PGRST116")) {
+        setDbError("Database tables are not initialized on your Supabase backend yet. Please run the SQL migration script (available on the Login page/Supabase panel) in your Supabase SQL Editor to activate live listings!");
+      } else {
+        setDbError(error.message || "Failed to fetch from live database.");
+      }
+
+      // Filter on local/mock INITIAL_PROPERTIES for visual persistence
+      let filteredData = [...INITIAL_PROPERTIES];
+
+      if (selectedCounty !== "All Counties") {
+        filteredData = filteredData.filter(p => p.county === selectedCounty);
+      }
+      if (selectedType !== "all") {
+        filteredData = filteredData.filter(p => p.type === selectedType);
+      }
+      if (minPrice) {
+        filteredData = filteredData.filter(p => p.price >= parseFloat(minPrice));
+      }
+      if (maxPrice) {
+        filteredData = filteredData.filter(p => p.price <= parseFloat(maxPrice));
+      }
+      if (search.trim()) {
+        const keyword = search.toLowerCase();
+        filteredData = filteredData.filter(
+          p => p.title.toLowerCase().includes(keyword) ||
+               p.location.toLowerCase().includes(keyword) ||
+               p.description?.toLowerCase().includes(keyword)
+        );
+      }
+      if (selectedAmenities.length > 0) {
+        filteredData = filteredData.filter(p =>
+          selectedAmenities.every(amenity => p.amenities?.includes(amenity))
+        );
+      }
+
+      const from = pageNum * ITEMS_PER_PAGE;
+      const sliced = filteredData.slice(from, from + ITEMS_PER_PAGE);
+
+      if (isAppend) {
+        setProperties(prev => [...prev, ...sliced]);
+      } else {
+        setProperties(sliced);
+      }
+      setPageHasMore(from + sliced.length < filteredData.length);
     } finally {
       setLoading(false);
       setLoadingMore(false);
@@ -137,7 +189,7 @@ export const Browse: React.FC = () => {
       const ids = new Set(data.map((row: any) => row.property_id));
       setSavedPropertyIds(ids);
     } catch (err) {
-      console.error("Error loading saved property IDs:", err);
+      console.warn("Error loading saved property IDs (skipping):", err);
     }
   };
 
@@ -374,11 +426,37 @@ export const Browse: React.FC = () => {
 
       {/* Main Grid View */}
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <p className="text-sm font-semibold text-stone-500">
             Showing <span className="text-stone-900">{properties.length}</span> verified listings
           </p>
+          
+          {usingFallback && (
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-amber-50 text-amber-800 border border-amber-200">
+              <AlertTriangle className="h-3.5 w-3.5 text-amber-600 animate-pulse" />
+              <span>Database Connection Notice</span>
+            </span>
+          )}
         </div>
+
+        {usingFallback && (
+          <div className="p-5 rounded-2xl bg-amber-50 border border-amber-200/80 text-amber-950 text-xs sm:text-sm flex flex-col md:flex-row items-start gap-4 shadow-sm font-medium">
+            <div className="p-2.5 bg-amber-100 rounded-xl text-amber-700 shrink-0">
+              <Database className="h-5 w-5" />
+            </div>
+            <div className="space-y-2">
+              <h4 className="font-bold text-stone-900 text-sm flex items-center gap-1.5">
+                Supabase Tables Missing / Uninitialized
+              </h4>
+              <p className="text-stone-600 leading-relaxed text-xs">
+                Nestlist is pointed to your real live Supabase instance (<span className="font-mono bg-white px-1 py-0.5 rounded text-amber-800 break-all">{getSupabaseConfig().url}</span>). However, required tables (e.g. <code className="font-mono bg-stone-100 px-1 py-0.5 rounded text-red-700">properties</code>) were not found on this project.
+              </p>
+              <p className="text-stone-600 leading-relaxed text-xs">
+                We have gracefully loaded our high-fidelity local listings so you can continue exploring the application features immediately! To activate live database entries, please go to the <strong className="text-stone-900">Sign In</strong> or <strong className="text-stone-900">Sign Up</strong> page, expand the <strong className="text-amber-900">Supabase Database Connection</strong> panel, copy the table creation script, and run it in your <strong className="text-stone-900">Supabase SQL Editor</strong>.
+              </p>
+            </div>
+          </div>
+        )}
 
         {loading ? (
           /* LOADING PLACEHOLDERS */

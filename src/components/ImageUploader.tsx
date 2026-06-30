@@ -7,12 +7,14 @@ interface ImageUploaderProps {
   onImagesUploaded: (urls: string[]) => void;
   existingImages?: string[];
   maxImages?: number;
+  propertyId?: string;
 }
 
 export const ImageUploader: React.FC<ImageUploaderProps> = ({
   onImagesUploaded,
   existingImages = [],
   maxImages = 6,
+  propertyId,
 }) => {
   const { profile } = useAuth();
   const [uploadedUrls, setUploadedUrls] = useState<string[]>(existingImages);
@@ -20,6 +22,15 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
   const [uploadProgress, setUploadProgress] = useState<number>(0);
   const [dragActive, setDragActive] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const getPathFromUrl = (url: string): string | null => {
+    const bucketToken = "App-files/";
+    const idx = url.indexOf(bucketToken);
+    if (idx !== -1) {
+      return decodeURIComponent(url.substring(idx + bucketToken.length));
+    }
+    return null;
+  };
 
   const handleUpload = async (files: FileList) => {
     if (!profile) return;
@@ -35,25 +46,35 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
     try {
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
-        if (!file.type.startsWith("image/")) {
-          alert("Only image files are allowed.");
+        
+        // Strict file type validation: restrict to jpg, png, webp
+        const allowedTypes = ["image/jpeg", "image/png", "image/webp", "image/jpg"];
+        if (!allowedTypes.includes(file.type)) {
+          alert("Only JPG, PNG, and WEBP image types are allowed.");
           continue;
         }
+        
+        // Strict file size validation: max 5MB
         if (file.size > 5 * 1024 * 1024) {
           alert("Image file size must be less than 5MB.");
           continue;
         }
 
-        // Create a unique file path structure: landlordUid/filename_timestamp
+        // Create a unique file path structure: user_id/filename
         const fileExt = file.name.split(".").pop();
         const fileName = `${Math.random().toString(36).substring(2, 10)}_${Date.now()}.${fileExt}`;
         const filePath = `${profile.id}/${fileName}`;
 
-        setUploadProgress(prev => Math.min(prev + 20, 80));
+        // Validate on the frontend that we are not uploading to another user's folder
+        if (!filePath.startsWith(profile.id + "/")) {
+          throw new Error("Invalid file path: path must reside in your own user folder.");
+        }
 
-        // Upload to Supabase Storage bucket 'property-images'
+        setUploadProgress(prev => Math.min(prev + 15, 85));
+
+        // Upload to Supabase Storage bucket 'App-files'
         const { error: uploadError } = await supabase.storage
-          .from("property-images")
+          .from("App-files")
           .upload(filePath, file, {
             cacheControl: "3600",
             upsert: false,
@@ -63,7 +84,7 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
 
         // Retrieve public URL
         const { data } = supabase.storage
-          .from("property-images")
+          .from("App-files")
           .getPublicUrl(filePath);
 
         if (data?.publicUrl) {
@@ -111,10 +132,55 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
     }
   };
 
-  const removeImage = (indexToRemove: number) => {
+  const removeImage = async (indexToRemove: number) => {
+    if (!profile) return;
+    const urlToRemove = uploadedUrls[indexToRemove];
+    const filePath = getPathFromUrl(urlToRemove);
+
+    if (filePath) {
+      // Validate that the file belongs to the user on the frontend
+      if (!filePath.startsWith(profile.id + "/")) {
+        console.warn("Unauthorized delete attempt: path does not belong to user.");
+        alert("You are not authorized to delete this file.");
+        return;
+      }
+
+      try {
+        const { error: deleteError } = await supabase.storage
+          .from("App-files")
+          .remove([filePath]);
+
+        if (deleteError) {
+          console.error("Storage delete failed:", deleteError.message);
+        } else {
+          console.log("Successfully removed file from storage:", filePath);
+        }
+      } catch (err) {
+        console.error("Failed to delete file from storage:", err);
+      }
+    }
+
     const updated = uploadedUrls.filter((_, idx) => idx !== indexToRemove);
     setUploadedUrls(updated);
     onImagesUploaded(updated);
+
+    // If a propertyId is being edited/saved, update its database record
+    if (propertyId) {
+      try {
+        const { error: dbError } = await supabase
+          .from("properties")
+          .update({ images: updated })
+          .eq("id", propertyId);
+
+        if (dbError) {
+          console.error("Failed to update database record for property images:", dbError.message);
+        } else {
+          console.log("Database record updated with new image list.");
+        }
+      } catch (err) {
+        console.error("Error updating database record for property images:", err);
+      }
+    }
   };
 
   const triggerFileSelect = () => {

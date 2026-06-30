@@ -95,13 +95,27 @@ export const Header: React.FC = () => {
                   <p className="text-sm font-semibold text-stone-800 leading-tight">
                     {profile.full_name}
                   </p>
-                  <p className="text-[11px] font-medium text-stone-400 capitalize">
-                    {profile.role}
-                  </p>
+                  <Link
+                    to="/onboarding?edit=true"
+                    className="text-[10px] font-bold text-amber-600 hover:text-amber-700 hover:underline block text-right mt-0.5"
+                  >
+                    Edit Profile
+                  </Link>
                 </div>
-                <div className="flex h-9 w-9 items-center justify-center rounded-full bg-stone-100 text-stone-600 border border-stone-200">
-                  <User className="h-4 w-4" />
-                </div>
+                <Link to="/onboarding?edit=true" title="Edit Profile">
+                  {profile.avatar_url ? (
+                    <img
+                      src={profile.avatar_url}
+                      alt={profile.full_name}
+                      className="h-9 w-9 rounded-full object-cover border border-stone-200 shadow-sm hover:ring-2 hover:ring-amber-500 transition-all"
+                      referrerPolicy="no-referrer"
+                    />
+                  ) : (
+                    <div className="flex h-9 w-9 items-center justify-center rounded-full bg-stone-100 text-stone-600 border border-stone-200 hover:border-amber-500 transition-all">
+                      <User className="h-4 w-4" />
+                    </div>
+                  )}
+                </Link>
                 <button
                   onClick={handleSignOut}
                   className="p-2 text-stone-400 hover:text-stone-900 transition-colors"
@@ -208,14 +222,29 @@ export const Header: React.FC = () => {
 
           <div className="pt-4 border-t border-stone-200 mt-2 flex items-center justify-between">
             <div className="flex items-center space-x-3">
-              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-stone-200 text-stone-700">
-                <User className="h-5 w-5" />
-              </div>
+              {profile.avatar_url ? (
+                <img
+                  src={profile.avatar_url}
+                  alt={profile.full_name}
+                  className="h-10 w-10 rounded-full object-cover border border-stone-200 shadow-sm"
+                  referrerPolicy="no-referrer"
+                />
+              ) : (
+                <div className="flex h-9 w-9 items-center justify-center rounded-full bg-stone-200 text-stone-700">
+                  <User className="h-5 w-5" />
+                </div>
+              )}
               <div>
                 <p className="text-sm font-semibold text-stone-800 leading-tight">
                   {profile.full_name}
                 </p>
-                <p className="text-xs text-stone-400 capitalize">{profile.role}</p>
+                <Link
+                  to="/onboarding?edit=true"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="text-[11px] font-bold text-amber-600 hover:text-amber-700 hover:underline"
+                >
+                  Edit Profile
+                </Link>
               </div>
             </div>
             <button

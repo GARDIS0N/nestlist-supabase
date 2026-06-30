@@ -1,33 +1,144 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { supabase } from "../lib/supabase";
-import { User, Phone, CheckCircle2, AlertCircle } from "lucide-react";
+import { User, Phone, CheckCircle2, AlertCircle, Camera, Loader2, Trash2 } from "lucide-react";
 
 export const Onboarding: React.FC = () => {
   const { session, profile, refreshProfile } = useAuth();
   const navigate = useNavigate();
 
+  const queryParams = new URLSearchParams(window.location.search);
+  const isEditing = queryParams.get("edit") === "true";
+
   const [fullName, setFullName] = useState("");
   const [phone, setPhone] = useState("");
   const [role, setRole] = useState<"landlord" | "tenant">("tenant");
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [avatarUploading, setAvatarUploading] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   useEffect(() => {
-    // If user already has a complete profile, redirect to correct starting page
-    if (profile && profile.role) {
+    // If user already has a complete profile and is NOT in editing mode, redirect to correct starting page
+    if (!isEditing && profile && profile.role) {
       if (profile.role === "landlord") {
         navigate("/dashboard", { replace: true });
       } else {
         navigate("/", { replace: true });
       }
     }
-    // Pre-populate name if user exists in session
-    if (session?.user) {
-      setFullName(profile?.full_name || session.user.user_metadata?.full_name || "");
+  }, [profile, isEditing, navigate]);
+
+  useEffect(() => {
+    if (profile) {
+      setFullName(profile.full_name || "");
+      setPhone(profile.phone || "");
+      setRole(profile.role || "tenant");
+      setAvatarUrl(profile.avatar_url || null);
+    } else if (session?.user) {
+      setFullName(session.user.user_metadata?.full_name || "");
     }
-  }, [profile, session, navigate]);
+  }, [profile, session]);
+
+  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!session?.user?.id) return;
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate type (JPG, PNG, WEBP)
+    const allowedTypes = ["image/jpeg", "image/png", "image/webp", "image/jpg"];
+    if (!allowedTypes.includes(file.type)) {
+      alert("Only JPG, PNG, and WEBP images are allowed.");
+      return;
+    }
+
+    // Validate size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      alert("Avatar image file size must be less than 5MB.");
+      return;
+    }
+
+    setAvatarUploading(true);
+    try {
+      const fileExt = file.name.split(".").pop();
+      const fileName = `avatar_${Date.now()}.${fileExt}`;
+      const filePath = `${session.user.id}/${fileName}`;
+
+      // Validate path on frontend before upload to prevent uploading to another user's folder
+      if (!filePath.startsWith(session.user.id + "/")) {
+        throw new Error("Unauthorized file path: destination must reside in your user folder.");
+      }
+
+      const { error: uploadErr } = await supabase.storage
+        .from("App-files")
+        .upload(filePath, file, {
+          cacheControl: "3600",
+          upsert: true,
+        });
+
+      if (uploadErr) throw uploadErr;
+
+      const { data } = supabase.storage
+        .from("App-files")
+        .getPublicUrl(filePath);
+
+      if (data?.publicUrl) {
+        setAvatarUrl(data.publicUrl);
+        
+        // If profile exists and is editing, write to db immediately
+        if (profile) {
+          await supabase
+            .from("profiles")
+            .update({ avatar_url: data.publicUrl })
+            .eq("id", session.user.id);
+          await refreshProfile();
+        }
+      }
+    } catch (err: any) {
+      console.error("Avatar upload failed:", err);
+      alert(`Avatar upload failed: ${err.message || "Unknown error"}`);
+    } finally {
+      setAvatarUploading(false);
+    }
+  };
+
+  const handleAvatarRemove = async () => {
+    if (!session?.user?.id || !avatarUrl) return;
+
+    const getPathFromUrl = (url: string): string | null => {
+      const bucketToken = "App-files/";
+      const idx = url.indexOf(bucketToken);
+      if (idx !== -1) {
+        return decodeURIComponent(url.substring(idx + bucketToken.length));
+      }
+      return null;
+    };
+
+    const filePath = getPathFromUrl(avatarUrl);
+    if (filePath) {
+      if (!filePath.startsWith(session.user.id + "/")) {
+        console.warn("Unauthorized delete attempt on avatar.");
+        return;
+      }
+      try {
+        await supabase.storage.from("App-files").remove([filePath]);
+      } catch (err) {
+        console.error("Failed to delete avatar from storage:", err);
+      }
+    }
+
+    setAvatarUrl(null);
+    if (profile) {
+      await supabase
+        .from("profiles")
+        .update({ avatar_url: null })
+        .eq("id", session.user.id);
+      await refreshProfile();
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -52,7 +163,7 @@ export const Onboarding: React.FC = () => {
           full_name: fullName,
           phone: phone,
           role: role,
-          avatar_url: profile?.avatar_url || null,
+          avatar_url: avatarUrl,
           created_at: profile?.created_at || new Date().toISOString()
         });
 
@@ -61,18 +172,20 @@ export const Onboarding: React.FC = () => {
       // Ensure local state context updates
       await refreshProfile();
 
-      // Send simulated welcome SMS
-      const welcomeText = role === "landlord"
-        ? `Karibu Nestlist, ${fullName}! List your rooms, bedsitters, and apartments, pay the listing fee easily via M-Pesa, and start receiving inquiries instantly via SMS.`
-        : `Karibu Nestlist, ${fullName}! Search and filter rentals across Kenya, save favorites, and subscribe to search alerts. We notify you via SMS when matching rentals are listed!`;
-
-      await supabase.functions.invoke("send-sms", {
-        body: {
-          type: `welcome_${role}`,
-          phone: phone,
-          data: { name: fullName }
+      if (!isEditing) {
+        // Send simulated welcome SMS on first onboarding
+        try {
+          await supabase.functions.invoke("send-sms", {
+            body: {
+              type: `welcome_${role}`,
+              phone: phone,
+              data: { name: fullName }
+            }
+          });
+        } catch (smsErr) {
+          console.warn("SMS greeting trigger skipped during onboarding:", smsErr);
         }
-      });
+      }
 
       // Redirect
       if (role === "landlord") {
@@ -98,10 +211,10 @@ export const Onboarding: React.FC = () => {
             <span className="font-sans text-2xl font-black">N</span>
           </div>
           <h2 className="mt-4 text-2xl sm:text-3xl font-bold tracking-tight text-stone-950">
-            One last step!
+            {isEditing ? "Profile Settings" : "One last step!"}
           </h2>
           <p className="mt-1.5 text-xs sm:text-sm text-stone-500 font-medium">
-            Complete your profile to unlock Nestlist's features.
+            {isEditing ? "Update your personal details and profile picture." : "Complete your profile to unlock Nestlist's features."}
           </p>
         </div>
 
@@ -113,6 +226,67 @@ export const Onboarding: React.FC = () => {
         )}
 
         <form onSubmit={handleSubmit} className="space-y-5">
+          {/* Avatar Profile Picture Upload */}
+          <div className="flex flex-col items-center justify-center space-y-2 py-2">
+            <label className="text-xs font-bold text-stone-700 uppercase tracking-wider block text-center">
+              Profile Photo
+            </label>
+            <div className="relative group">
+              <div className="h-24 w-24 rounded-full overflow-hidden border-2 border-amber-600 bg-stone-100 shadow-md flex items-center justify-center relative">
+                {avatarUploading ? (
+                  <div className="absolute inset-0 bg-stone-900/40 flex items-center justify-center text-white z-10">
+                    <Loader2 className="h-6 w-6 animate-spin" />
+                  </div>
+                ) : null}
+                {avatarUrl ? (
+                  <img
+                    src={avatarUrl}
+                    alt="Profile preview"
+                    className="h-full w-full object-cover"
+                    referrerPolicy="no-referrer"
+                  />
+                ) : (
+                  <div className="text-stone-400">
+                    <User className="h-10 w-10" />
+                  </div>
+                )}
+              </div>
+              
+              {/* Camera Icon Overlay to Upload */}
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={avatarUploading}
+                className="absolute bottom-0 right-0 p-2 bg-amber-600 hover:bg-amber-700 text-white rounded-full shadow-lg border border-white transition transform hover:scale-105"
+                title="Upload Photo"
+              >
+                <Camera className="h-4 w-4" />
+              </button>
+              
+              {avatarUrl && !avatarUploading && (
+                <button
+                  type="button"
+                  onClick={handleAvatarRemove}
+                  className="absolute top-0 right-0 p-1.5 bg-red-600 hover:bg-red-700 text-white rounded-full shadow-lg border border-white transition transform hover:scale-105"
+                  title="Remove Photo"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </button>
+              )}
+            </div>
+            
+            <input
+              type="file"
+              ref={fileInputRef}
+              onChange={handleAvatarUpload}
+              accept="image/png, image/jpeg, image/jpg, image/webp"
+              className="hidden"
+            />
+            <p className="text-[10px] text-stone-400 text-center font-medium">
+              JPG, PNG or WEBP up to 5MB
+            </p>
+          </div>
+
           {/* Role selector */}
           <div className="space-y-1.5">
             <label className="text-xs font-bold text-stone-700 uppercase tracking-wider block">
@@ -196,7 +370,7 @@ export const Onboarding: React.FC = () => {
             ) : (
               <>
                 <CheckCircle2 className="h-5 w-5" />
-                <span>Complete Onboarding</span>
+                <span>{isEditing ? "Save Profile Changes" : "Complete Onboarding"}</span>
               </>
             )}
           </button>

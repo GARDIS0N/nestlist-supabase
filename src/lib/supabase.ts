@@ -27,7 +27,7 @@ const useRealSupabase = !isPlaceholder(supabaseUrl) && !isPlaceholder(supabaseAn
 // =====================================================================
 // DUMMY PROPERTIES SEED DATA (REPRESENTING KENYA LOCATIONS)
 // =====================================================================
-const INITIAL_PROPERTIES = [
+export const INITIAL_PROPERTIES = [
   {
     id: "prop-1",
     landlord_id: "landlord-1",
@@ -318,6 +318,11 @@ class SupabaseSimulator {
     },
 
     resetPasswordForEmail: async (email: string) => {
+      return { data: {}, error: null };
+    },
+
+    resend: async ({ type, email }: { type: 'signup' | 'signup_additional' | 'invite' | 'recovery' | 'email_change' | 'sms_otp'; email: string }) => {
+      // Simulate success for signup/resend confirmation email
       return { data: {}, error: null };
     },
 

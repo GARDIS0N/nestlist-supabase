@@ -460,7 +460,7 @@ export const ListProperty: React.FC = () => {
             <span>Step 3: Property Images</span>
           </h2>
 
-          <ImageUploader onImagesUploaded={(urls) => setUploadedImages(urls)} existingImages={uploadedImages} />
+          <ImageUploader onImagesUploaded={(urls) => setUploadedImages(urls)} existingImages={uploadedImages} propertyId={propertyId || undefined} />
 
           <div className="flex justify-between pt-5 border-t border-stone-100">
             <button
