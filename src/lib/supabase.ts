@@ -361,15 +361,25 @@ class SupabaseSimulator {
     this.authChangeCallbacks.forEach(cb => cb(event, session));
   }
 
+  private storageUrls: Record<string, string> = {};
+
   // STORAGE API
   storage = {
     from: (bucket: string) => ({
       upload: async (path: string, file: File) => {
-        // Return dummy URL path
-        const fileUrl = URL.createObjectURL(file);
+        try {
+          const fileUrl = URL.createObjectURL(file);
+          this.storageUrls[`${bucket}:${path}`] = fileUrl;
+        } catch (e) {
+          // Fallback if URL.createObjectURL is not available
+        }
         return { data: { path }, error: null };
       },
       getPublicUrl: (path: string) => {
+        const cachedUrl = this.storageUrls[`${bucket}:${path}`];
+        if (cachedUrl) {
+          return { data: { publicUrl: cachedUrl } };
+        }
         // Fallback to random high-quality images for property uploading
         const imagesList = [
           "https://images.unsplash.com/photo-1522771739844-6a9f6d5f14af?auto=format&fit=crop&w=800&q=80",
@@ -380,6 +390,12 @@ class SupabaseSimulator {
         // Distribute based on path length to make them consistent
         const index = path.length % imagesList.length;
         return { data: { publicUrl: imagesList[index] } };
+      },
+      remove: async (paths: string[]) => {
+        paths.forEach(p => {
+          delete this.storageUrls[`${bucket}:${p}`];
+        });
+        return { data: paths.map(p => ({ name: p })), error: null };
       }
     })
   };

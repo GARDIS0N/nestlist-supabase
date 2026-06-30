@@ -63,9 +63,8 @@ export const Onboarding: React.FC = () => {
 
     setAvatarUploading(true);
     try {
-      const fileExt = file.name.split(".").pop();
-      const fileName = `avatar_${Date.now()}.${fileExt}`;
-      const filePath = `${session.user.id}/${fileName}`;
+      const sanitizedFileName = file.name.replace(/[^a-zA-Z0-9_.-]/g, "_");
+      const filePath = `${session.user.id}/${Date.now()}-${sanitizedFileName}`;
 
       // Validate path on frontend before upload to prevent uploading to another user's folder
       if (!filePath.startsWith(session.user.id + "/")) {
@@ -86,13 +85,15 @@ export const Onboarding: React.FC = () => {
         .getPublicUrl(filePath);
 
       if (data?.publicUrl) {
-        setAvatarUrl(data.publicUrl);
+        // Append a cache-busting query parameter to prevent caching issues
+        const busterUrl = `${data.publicUrl}?t=${Date.now()}`;
+        setAvatarUrl(busterUrl);
         
         // If profile exists and is editing, write to db immediately
         if (profile) {
           await supabase
             .from("profiles")
-            .update({ avatar_url: data.publicUrl })
+            .update({ avatar_url: busterUrl })
             .eq("id", session.user.id);
           await refreshProfile();
         }
@@ -102,6 +103,10 @@ export const Onboarding: React.FC = () => {
       alert(`Avatar upload failed: ${err.message || "Unknown error"}`);
     } finally {
       setAvatarUploading(false);
+      // Reset input value to allow uploading same/different images seamlessly
+      if (e.target) {
+        e.target.value = "";
+      }
     }
   };
 

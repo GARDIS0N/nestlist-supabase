@@ -60,10 +60,9 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
           continue;
         }
 
-        // Create a unique file path structure: user_id/filename
-        const fileExt = file.name.split(".").pop();
-        const fileName = `${Math.random().toString(36).substring(2, 10)}_${Date.now()}.${fileExt}`;
-        const filePath = `${profile.id}/${fileName}`;
+        // Create a unique file path structure: user_id/filename with timestamp and sanitized filename
+        const sanitizedFileName = file.name.replace(/[^a-zA-Z0-9_.-]/g, "_");
+        const filePath = `${profile.id}/${Date.now()}-${sanitizedFileName}`;
 
         // Validate on the frontend that we are not uploading to another user's folder
         if (!filePath.startsWith(profile.id + "/")) {
@@ -88,7 +87,9 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
           .getPublicUrl(filePath);
 
         if (data?.publicUrl) {
-          newUrls.push(data.publicUrl);
+          // Append a cache-busting query parameter to prevent CDN and browser caching issues
+          const busterUrl = `${data.publicUrl}?t=${Date.now()}`;
+          newUrls.push(busterUrl);
         }
       }
 
@@ -124,11 +125,18 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
       handleUpload(e.dataTransfer.files);
     }
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       handleUpload(e.target.files);
+    }
+    // Reset file input value to allow selecting and uploading the same file again
+    if (e.target) {
+      e.target.value = "";
     }
   };
 
