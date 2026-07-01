@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import { LogIn, KeyRound, Mail, AlertCircle, Sparkles } from "lucide-react";
+import { LogIn, KeyRound, Mail, AlertCircle, Settings, X, Eye, EyeOff, ShieldCheck, Check, Lock } from "lucide-react";
 import { SupabaseConfigPanel } from "../components/SupabaseConfigPanel";
-import { supabase } from "../lib/supabase";
+import { supabase, getSupabaseConfig } from "../lib/supabase";
 
 export const Login: React.FC = () => {
   const { signIn, signInWithGoogle, resetPassword } = useAuth();
@@ -14,6 +14,7 @@ export const Login: React.FC = () => {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
 
   // Email verification status state
   const [isEmailNotConfirmed, setIsEmailNotConfirmed] = useState(false);
@@ -25,7 +26,18 @@ export const Login: React.FC = () => {
   const [resetSent, setResetSent] = useState(false);
   const [resetEmail, setResetEmail] = useState("");
 
+  // Dev configuration panel state
+  const [showConfig, setShowConfig] = useState(false);
+
   const redirectPath = location.state?.from?.pathname || "/";
+
+  // Check for mock mode on load and log developer notice to console only
+  useEffect(() => {
+    const config = getSupabaseConfig();
+    if (config.isMock) {
+      console.log("[NestList Developer Notice] Running in Simulator Mode (Mock). Connect a real Supabase DB via the gear icon in development to use live persistent authentication.");
+    }
+  }, []);
 
   // Countdown timer for email resending
   useEffect(() => {
@@ -39,7 +51,7 @@ export const Login: React.FC = () => {
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email || !password) {
-      setError("Please fill in all fields.");
+      setError("⚠ Please fill in all fields.");
       return;
     }
 
@@ -48,22 +60,67 @@ export const Login: React.FC = () => {
     setIsEmailNotConfirmed(false);
     setResendStatus("idle");
 
-    const { data, error: err } = await signIn(email, password);
+    try {
+      const { data, error: err } = await signIn(email, password);
 
-    if (err) {
-      const errMsg = err.message || "";
-      if (
-        errMsg.toLowerCase().includes("email not confirmed") ||
-        errMsg.toLowerCase().includes("email_not_confirmed") ||
-        errMsg.toLowerCase().includes("confirm your email")
-      ) {
-        setIsEmailNotConfirmed(true);
+      if (err) {
+        const errMsg = err.message || "";
+        if (
+          errMsg.toLowerCase().includes("email not confirmed") ||
+          errMsg.toLowerCase().includes("email_not_confirmed") ||
+          errMsg.toLowerCase().includes("confirm your email")
+        ) {
+          setIsEmailNotConfirmed(true);
+        } else if (
+          errMsg.toLowerCase().includes("invalid grant") ||
+          errMsg.toLowerCase().includes("invalid credentials") ||
+          errMsg.toLowerCase().includes("incorrect password") ||
+          errMsg.toLowerCase().includes("invalid login")
+        ) {
+          setError("⚠ Incorrect email or password. Please try again.");
+        } else if (
+          errMsg.toLowerCase().includes("user not found") ||
+          errMsg.toLowerCase().includes("email not found") ||
+          errMsg.toLowerCase().includes("no user")
+        ) {
+          setError("⚠ No account found with this email.");
+        } else if (
+          errMsg.toLowerCase().includes("failed to fetch") ||
+          errMsg.toLowerCase().includes("network") ||
+          errMsg.toLowerCase().includes("timeout")
+        ) {
+          setError("⚠ Connection failed. Please check your internet.");
+        } else {
+          setError(`⚠ ${errMsg}`);
+        }
+        setLoading(false);
       } else {
-        setError(errMsg || "Invalid login credentials.");
+        // Success! Determine user's role to redirect correctly
+        const userId = data?.user?.id;
+        if (userId) {
+          const { data: profileData } = await supabase
+            .from("profiles")
+            .select("role")
+            .eq("id", userId)
+            .single();
+
+          const role = profileData?.role || "tenant";
+          
+          if (role === "admin" || role === "superadmin") {
+            navigate("/admin", { replace: true });
+          } else if (role === "landlord" || role === "caretaker" || role === "agent") {
+            navigate("/dashboard", { replace: true });
+          } else {
+            navigate("/", { replace: true });
+          }
+        } else {
+          navigate(redirectPath, { replace: true });
+        }
       }
+    } catch (catchErr: any) {
+      console.error("Login catch-block exception:", catchErr);
+      setError("⚠ Connection failed. Please check your internet.");
       setLoading(false);
-    } else {
-      navigate(redirectPath, { replace: true });
     }
   };
 
@@ -95,15 +152,38 @@ export const Login: React.FC = () => {
     if (err) {
       setError(err.message || "Google OAuth failed.");
     } else {
-      // With our high-fidelity simulator, OAuth completes immediately.
-      navigate(redirectPath, { replace: true });
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        const userId = session?.user?.id;
+        if (userId) {
+          const { data: profileData } = await supabase
+            .from("profiles")
+            .select("role")
+            .eq("id", userId)
+            .single();
+          
+          const role = profileData?.role || "tenant";
+          if (role === "admin" || role === "superadmin") {
+            navigate("/admin", { replace: true });
+          } else if (role === "landlord" || role === "caretaker" || role === "agent") {
+            navigate("/dashboard", { replace: true });
+          } else {
+            navigate("/", { replace: true });
+          }
+        } else {
+          navigate(redirectPath, { replace: true });
+        }
+      } catch (err) {
+        console.error("Google login redirect error:", err);
+        navigate(redirectPath, { replace: true });
+      }
     }
   };
 
   const handleResetPassword = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!resetEmail) {
-      setError("Please enter your email to receive a reset link.");
+      setError("⚠ Please enter your email to receive a reset link.");
       return;
     }
 
@@ -120,271 +200,373 @@ export const Login: React.FC = () => {
     setLoading(false);
   };
 
-  return (
-    <div className="min-h-[calc(100vh-4rem)] flex flex-col items-center justify-center bg-stone-50 px-4 py-12 sm:px-6 lg:px-8 space-y-6">
-      
-      {/* Supabase Connection Setup Panel */}
-      <div className="w-full max-w-md">
-        <SupabaseConfigPanel />
-      </div>
+  const handleInputChange = (field: "email" | "password", val: string) => {
+    if (field === "email") {
+      setEmail(val);
+    } else {
+      setPassword(val);
+    }
+    // Clear error on typing
+    if (error) setError(null);
+  };
 
-      <div className="w-full max-w-md space-y-8 bg-white p-8 rounded-2xl border border-stone-200/80 shadow-xl shadow-stone-100">
-        
-        {/* Header */}
-        <div className="text-center">
-          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-600 text-white shadow-md shadow-amber-600/10">
-            <span className="font-sans text-2xl font-black">N</span>
+  return (
+    <div className="min-h-screen flex bg-white font-sans relative" id="login-root">
+      
+      {/* Dev Only Gear Icon in Top Right */}
+      {!!(import.meta as any).env?.DEV && (
+        <button
+          type="button"
+          onClick={() => setShowConfig(true)}
+          className="absolute top-5 right-5 p-3 rounded-full bg-stone-100 hover:bg-stone-200 text-stone-600 transition duration-150 z-50 shadow-md border border-stone-200"
+          title="Configure Supabase Connection"
+          id="dev-config-btn"
+        >
+          <Settings className="h-5 w-5 animate-spin-slow" />
+        </button>
+      )}
+
+      {/* Supabase connection setup modal overlay */}
+      {showConfig && (
+        <div className="fixed inset-0 bg-stone-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in" id="dev-config-modal">
+          <div className="relative bg-white rounded-3xl p-6 max-w-lg w-full shadow-2xl border border-stone-200">
+            <button
+              onClick={() => setShowConfig(false)}
+              className="absolute top-4 right-4 p-2 text-stone-400 hover:text-stone-600 hover:bg-stone-100 rounded-full transition"
+            >
+              <X className="h-5 w-5" />
+            </button>
+            <div className="mt-2 max-h-[80vh] overflow-y-auto pr-1">
+              <SupabaseConfigPanel />
+            </div>
           </div>
-          <h2 className="mt-4 text-2xl sm:text-3xl font-bold tracking-tight text-stone-950 font-sans">
-            Welcome back to Nestlist
-          </h2>
-          <p className="mt-1.5 text-xs sm:text-sm text-stone-500 font-medium">
-            Connecting Kenyan landlords & tenants securely
-          </p>
+        </div>
+      )}
+
+      {/* LEFT PANEL — DESKTOP ONLY */}
+      <div className="hidden md:flex md:w-[45%] flex-col justify-between p-12 text-white relative overflow-hidden" 
+           style={{ background: "linear-gradient(135deg, #0A4D2E, #1E6B4A)" }}
+           id="desktop-left-panel">
+        
+        {/* Subtle grid pattern background */}
+        <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.05)_1.5px,transparent_1.5px),linear-gradient(90deg,rgba(255,255,255,0.05)_1.5px,transparent_1.5px)] bg-[size:24px_24px] opacity-30 pointer-events-none"></div>
+
+        {/* Brand Header Group */}
+        <div className="space-y-6 relative z-10">
+          <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-white text-[#1E6B4A] shadow-xl animate-float">
+            <span className="font-serif text-4xl font-black">N</span>
+          </div>
+          <div>
+            <h1 className="text-4xl lg:text-5xl font-serif font-bold tracking-tight text-white leading-tight">
+              NestList
+            </h1>
+            <p className="mt-2.5 text-lg text-white/70 font-normal">
+              Kenya's Premium Rental Platform
+            </p>
+          </div>
         </div>
 
-        {isEmailNotConfirmed ? (
-          <div className="rounded-xl bg-amber-50 p-4 border border-amber-200 flex flex-col space-y-3 text-amber-900 text-xs sm:text-sm font-medium">
-            <div className="flex items-start space-x-3">
-              <AlertCircle className="h-5 w-5 text-amber-500 shrink-0 mt-0.5" />
-              <div className="space-y-1">
-                <p className="font-bold text-amber-950">Email confirmation pending</p>
-                <p className="text-amber-800 leading-relaxed">
-                  Your email <span className="font-semibold text-stone-900 break-all">{email}</span> hasn't been confirmed yet. Check your inbox (and spam folder) for the confirmation link.
+        {/* Divider and Trust Points */}
+        <div className="space-y-8 relative z-10 py-8 border-t border-white/20">
+          <div className="space-y-5">
+            <div className="flex items-center space-x-4">
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-white/10 text-white border border-white/10 text-lg">
+                🏠
+              </div>
+              <span className="text-base font-semibold text-white/90">1,200+ verified listings</span>
+            </div>
+            <div className="flex items-center space-x-4">
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-white/10 text-white border border-white/10 text-lg">
+                ✅
+              </div>
+              <span className="text-base font-semibold text-white/90">Trusted by landlords across Kenya</span>
+            </div>
+            <div className="flex items-center space-x-4">
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-white/10 text-white border border-white/10 text-lg">
+                🔒
+              </div>
+              <span className="text-base font-semibold text-white/90">Secure M-Pesa payments</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Footer info */}
+        <div className="relative z-10 text-xs text-white/60">
+          © 2026 Nestlist Rental Platforms Limited
+        </div>
+      </div>
+
+      {/* RIGHT PANEL — FORM PANEL */}
+      <div className="w-full md:w-[55%] flex flex-col justify-center items-center px-6 py-12 md:px-16" id="login-form-panel">
+        
+        <div className="w-full max-w-[400px] space-y-8 animate-fade-in">
+          
+          {/* Logo on mobile view only */}
+          <div className="flex md:hidden flex-col items-center justify-center text-center space-y-4">
+            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-[#1E6B4A] to-[#34D399] text-white shadow-lg shadow-emerald-950/10">
+              <span className="font-serif text-3xl font-black">N</span>
+            </div>
+            <h2 className="text-3xl font-serif font-bold text-stone-900 tracking-tight">
+              NestList
+            </h2>
+          </div>
+
+          {/* Form Header Title */}
+          <div className="text-center md:text-left">
+            <h3 className="hidden md:block text-3xl font-serif font-bold text-stone-900 tracking-tight">
+              Welcome back
+            </h3>
+            <p className="mt-2 text-sm text-stone-500 font-medium">
+              Sign in to manage your listings
+            </p>
+          </div>
+
+          {/* ERROR DISPLAY BANNER */}
+          {error && (
+            <div className="rounded-xl bg-[#FEF2F2] p-4 border border-[#FECACA] text-[#DC2626] text-sm font-medium leading-relaxed flex items-start space-x-3 shadow-xs">
+              <AlertCircle className="h-5 w-5 text-[#DC2626] shrink-0 mt-0.5" />
+              <span>{error}</span>
+            </div>
+          )}
+
+          {/* Email verification pending notice */}
+          {isEmailNotConfirmed && (
+            <div className="rounded-xl bg-[#F0FDF4] p-4 border border-[#A7F3D0] text-[#065F46] text-sm font-medium leading-relaxed flex flex-col space-y-3 shadow-xs">
+              <div className="flex items-start space-x-3">
+                <AlertCircle className="h-5 w-5 text-[#34D399] shrink-0 mt-0.5" />
+                <div className="space-y-1">
+                  <p className="font-bold text-[#065F46]">Email confirmation pending</p>
+                  <p className="text-[#065F46]/95">
+                    Your email hasn't been confirmed yet. Please check your inbox for the confirmation link.
+                  </p>
+                </div>
+              </div>
+              <div className="pl-8 flex flex-wrap gap-2 items-center">
+                <button
+                  type="button"
+                  onClick={handleResendConfirmation}
+                  disabled={resendStatus === "sending" || resendCountdown > 0}
+                  className="text-xs font-bold text-[#1E6B4A] hover:underline disabled:text-stone-400 disabled:no-underline transition"
+                >
+                  {resendStatus === "sending" ? "Resending..." : resendCountdown > 0 ? `Resend in ${resendCountdown}s` : "Resend confirmation email"}
+                </button>
+                {resendStatus === "success" && (
+                  <span className="text-xs font-bold text-emerald-600">Resent successfully!</span>
+                )}
+                {resendStatus === "error" && (
+                  <span className="text-xs font-bold text-red-500">Resend failed. Try again.</span>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* RESET PASSWORD VIEW */}
+          {resetting ? (
+            <form onSubmit={handleResetPassword} className="space-y-5">
+              <div className="space-y-2">
+                <h4 className="text-xl font-bold text-stone-900 font-serif">Reset Password</h4>
+                <p className="text-sm text-stone-500 leading-relaxed">
+                  Enter your email address and we'll send you an automated link to securely set a new password.
                 </p>
               </div>
-            </div>
-            
-            <div className="pl-8 flex flex-col sm:flex-row sm:items-center gap-2">
+
+              {resetSent ? (
+                <div className="bg-[#F0FDF4] text-[#065F46] p-4 rounded-xl border border-[#A7F3D0] text-sm font-medium">
+                  ✓ Password reset link sent! Please check your email inbox and spam folder.
+                </div>
+              ) : (
+                <div className="space-y-1.5">
+                  <label className="text-[11px] font-bold text-stone-500 uppercase tracking-wider">
+                    Email Address
+                  </label>
+                  <div className="relative">
+                    <Mail className="absolute left-3.5 top-3.5 h-5 w-5 text-stone-400" />
+                    <input
+                      type="email"
+                      value={resetEmail}
+                      onChange={(e) => setResetEmail(e.target.value)}
+                      placeholder="name@example.com"
+                      className="w-full pl-11 pr-4 py-3.5 rounded-xl border border-stone-200 focus:outline-none focus:border-[#1E6B4A] focus:ring-4 focus:ring-[#1E6B4A]/10 text-base"
+                      style={{ minHeight: "48px" }}
+                      required
+                    />
+                  </div>
+                </div>
+              )}
+
+              <div className="flex items-center justify-between gap-4 pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setResetting(false);
+                    setResetSent(false);
+                  }}
+                  className="w-1/2 py-3 px-4 text-sm font-semibold border border-stone-200 text-stone-700 hover:bg-stone-50 rounded-xl transition"
+                  style={{ minHeight: "48px" }}
+                >
+                  Back to Login
+                </button>
+                {!resetSent && (
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="w-1/2 py-3 px-4 text-sm font-bold bg-gradient-to-r from-[#1E6B4A] to-[#34D399] text-white rounded-xl transition hover:-translate-y-0.5 hover:shadow-lg disabled:opacity-50"
+                    style={{ minHeight: "48px" }}
+                  >
+                    Send Reset Link
+                  </button>
+                )}
+              </div>
+            </form>
+          ) : (
+            /* STANDARD LOGIN FORM */
+            <form onSubmit={handleSignIn} className="space-y-6">
+              
+              {/* Inputs Group */}
+              <div className="space-y-5">
+                
+                {/* Email Address */}
+                <div className="space-y-1.5">
+                  <label className="text-[11px] font-bold text-stone-500 uppercase tracking-wider block">
+                    Email Address
+                  </label>
+                  <div className="relative">
+                    <Mail className="absolute left-3.5 top-3.5 h-5 w-5 text-stone-400 pointer-events-none" />
+                    <input
+                      type="email"
+                      value={email}
+                      onChange={(e) => handleInputChange("email", e.target.value)}
+                      placeholder="you@example.com"
+                      className="w-full pl-11 pr-4 py-3.5 rounded-xl border border-stone-200 bg-white transition duration-150 focus:outline-none focus:border-[#1E6B4A] focus:ring-4 focus:ring-[#1E6B4A]/10 text-base"
+                      style={{ minHeight: "48px" }}
+                      required
+                      id="email-input"
+                    />
+                  </div>
+                </div>
+
+                {/* Password */}
+                <div className="space-y-1.5">
+                  <div className="flex justify-between items-center">
+                    <label className="text-[11px] font-bold text-stone-500 uppercase tracking-wider">
+                      Password
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => setResetting(true)}
+                      className="text-xs font-bold text-[#1E6B4A] hover:underline"
+                    >
+                      Forgot Password?
+                    </button>
+                  </div>
+                  <div className="relative">
+                    <Lock className="absolute left-3.5 top-3.5 h-5 w-5 text-stone-400 pointer-events-none" />
+                    <input
+                      type={showPassword ? "text" : "password"}
+                      value={password}
+                      onChange={(e) => handleInputChange("password", e.target.value)}
+                      placeholder="••••••••"
+                      className="w-full pl-11 pr-12 py-3.5 rounded-xl border border-stone-200 bg-white transition duration-150 focus:outline-none focus:border-[#1E6B4A] focus:ring-4 focus:ring-[#1E6B4A]/10 text-base"
+                      style={{ minHeight: "48px" }}
+                      required
+                      id="password-input"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3.5 top-3.5 text-stone-400 hover:text-stone-600 transition"
+                      id="toggle-password-btn"
+                    >
+                      {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                    </button>
+                  </div>
+                </div>
+
+              </div>
+
+              {/* Submit Email Sign In Button */}
               <button
-                type="button"
-                onClick={handleResendConfirmation}
-                disabled={resendStatus === "sending" || resendCountdown > 0}
-                className="text-xs font-bold text-amber-700 hover:text-amber-800 underline disabled:text-stone-400 disabled:no-underline flex items-center gap-1.5 transition text-left"
+                type="submit"
+                disabled={loading}
+                className="w-full flex items-center justify-center space-x-2 py-3.5 px-5 text-[15px] font-bold text-white rounded-xl shadow-lg shadow-emerald-950/5 hover:-translate-y-0.5 hover:shadow-xl hover:shadow-emerald-950/10 active:translate-y-0 transition-all duration-200 disabled:opacity-50"
+                style={{
+                  background: "linear-gradient(135deg, #1E6B4A, #34D399)",
+                  minHeight: "48px"
+                }}
+                id="submit-signin-btn"
               >
-                {resendStatus === "sending" ? (
-                  <>
-                    <div className="h-3 w-3 border-2 border-amber-700 border-t-transparent rounded-full animate-spin"></div>
-                    <span>Resending...</span>
-                  </>
-                ) : resendCountdown > 0 ? (
-                  <span>Resend available in {resendCountdown}s</span>
+                {loading ? (
+                  <div className="h-5 w-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
                 ) : (
-                  <span>Resend confirmation email</span>
+                  <>
+                    <span>Sign In →</span>
+                  </>
                 )}
               </button>
-              
-              {resendStatus === "success" && (
-                <span className="text-xs font-bold text-emerald-600 sm:border-l sm:pl-2 border-amber-200">
-                  Confirmation email resent — check your inbox.
+
+              {/* Divider line */}
+              <div className="relative my-4 flex items-center">
+                <div className="flex-grow border-t border-stone-200"></div>
+                <span className="flex-shrink mx-4 text-[10px] font-bold text-stone-400 tracking-widest uppercase">
+                  OR CONTINUE WITH
                 </span>
-              )}
-              {resendStatus === "error" && (
-                <span className="text-xs font-bold text-red-600 sm:border-l sm:pl-2 border-amber-200">
-                  Could not resend email. Try again shortly.
-                </span>
-              )}
-            </div>
-          </div>
-        ) : error ? (
-          <div className="rounded-xl bg-red-50 p-4 border border-red-100 flex items-start space-x-3 text-red-700 text-xs sm:text-sm">
-            <AlertCircle className="h-5 w-5 text-red-500 shrink-0" />
-            <p className="font-medium leading-relaxed">{error}</p>
-          </div>
-        ) : null}
-
-        {/* RESET PASSWORD MODAL / FORM VIEW */}
-        {resetting ? (
-          <form onSubmit={handleResetPassword} className="space-y-4">
-            <h3 className="text-lg font-semibold text-stone-800">Reset Password</h3>
-            <p className="text-xs text-stone-500 leading-relaxed">
-              Enter your registration email address below. We'll send you an automated link to securely set a new password.
-            </p>
-
-            {resetSent ? (
-              <div className="bg-emerald-50 text-emerald-800 p-4 rounded-xl border border-emerald-100 text-xs sm:text-sm font-medium">
-                Password reset link sent to your email! Please check your spam folder if it doesn't arrive shortly.
+                <div className="flex-grow border-t border-stone-200"></div>
               </div>
-            ) : (
-              <div className="relative">
-                <Mail className="absolute left-3.5 top-3 h-5 w-5 text-stone-400" />
-                <input
-                  type="email"
-                  value={resetEmail}
-                  onChange={(e) => setResetEmail(e.target.value)}
-                  placeholder="name@example.com"
-                  className="w-full pl-11 pr-4 py-2.5 rounded-xl border border-stone-300 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500 text-sm"
-                  required
-                />
-              </div>
-            )}
 
-            <div className="flex items-center justify-between gap-3 pt-2">
+              {/* Google Login Button */}
               <button
                 type="button"
-                onClick={() => {
-                  setResetting(false);
-                  setResetSent(false);
-                }}
-                className="w-1/2 py-2.5 px-4 text-xs sm:text-sm font-semibold border border-stone-300 text-stone-700 hover:bg-stone-50 rounded-xl transition"
+                onClick={handleGoogleSignIn}
+                className="w-full flex items-center justify-center space-x-3 py-3 px-4 border border-stone-200 bg-white hover:bg-stone-50 rounded-xl text-stone-700 font-semibold text-sm transition-all duration-150 shadow-xs"
+                style={{ minHeight: "48px" }}
+                id="google-signin-btn"
               >
-                Back to Login
+                <svg className="h-5 w-5" viewBox="0 0 24 24">
+                  <path
+                    fill="#EA4335"
+                    d="M12.24 10.285V14.4h6.887c-.275 1.565-1.88 4.604-6.887 4.604-4.33 0-7.859-3.578-7.859-8s3.53-8 7.859-8c2.46 0 4.105 1.025 5.047 1.926l3.258-3.133C18.332 2.117 15.454 1 12.24 1 6.133 1 1.152 5.922 1.152 12s4.98 11 11.088 11c6.37 0 10.596-4.474 10.596-10.76 0-.726-.078-1.282-.175-1.955H12.24z"
+                  />
+                </svg>
+                <span>Continue with Google</span>
               </button>
-              {!resetSent && (
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="w-1/2 py-2.5 px-4 text-xs sm:text-sm font-semibold bg-amber-600 hover:bg-amber-700 text-white rounded-xl transition disabled:opacity-50"
-                >
-                  Send Reset Link
-                </button>
-              )}
-            </div>
-          </form>
-        ) : (
-          /* STANDARD LOGIN FORM */
-          <form onSubmit={handleSignIn} className="space-y-5">
-            {/* Quick Demo Accounts */}
-            <div className="bg-amber-50/50 border border-amber-200/60 rounded-xl p-3.5 space-y-2.5">
-              <div className="flex items-center space-x-2 text-amber-950 font-bold text-[10px] uppercase tracking-wider">
-                <Sparkles className="h-3.5 w-3.5 text-amber-600 animate-pulse" />
-                <span>Quick Demo Accounts (1-Click Fill)</span>
-              </div>
-              <div className="grid grid-cols-3 gap-2 text-[11px]">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setEmail("thesilentwhisper.ke@gmail.com");
-                    setPassword("password");
-                  }}
-                  className="flex flex-col items-center justify-center text-center p-2 bg-white hover:bg-amber-50/80 border border-stone-200/80 rounded-lg transition active:scale-[0.98] shadow-xs"
-                >
-                  <span className="font-bold text-stone-900">🛡️ Admin</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setEmail("landlord1@nestlist.co.ke");
-                    setPassword("password");
-                  }}
-                  className="flex flex-col items-center justify-center text-center p-2 bg-white hover:bg-amber-50/80 border border-stone-200/80 rounded-lg transition active:scale-[0.98] shadow-xs"
-                >
-                  <span className="font-bold text-stone-900">🏢 Landlord</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setEmail("tenant1@nestlist.co.ke");
-                    setPassword("password");
-                  }}
-                  className="flex flex-col items-center justify-center text-center p-2 bg-white hover:bg-amber-50/80 border border-stone-200/80 rounded-lg transition active:scale-[0.98] shadow-xs"
-                >
-                  <span className="font-bold text-stone-900">🏡 Tenant</span>
-                </button>
-              </div>
-            </div>
 
-            <div className="space-y-4">
-              {/* Email */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-stone-700 uppercase tracking-wider">
-                  Email Address
-                </label>
-                <div className="relative">
-                  <Mail className="absolute left-3.5 top-3 h-5 w-5 text-stone-400" />
-                  <input
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="e.g. kamau@domain.com"
-                    className="w-full pl-11 pr-4 py-2.5 rounded-xl border border-stone-300 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500 text-sm"
-                    required
-                  />
-                </div>
-              </div>
+              {/* Signup Redirect Link */}
+              <p className="text-center text-sm text-stone-600 font-medium">
+                Don't have an account?{" "}
+                <Link to="/signup" className="font-bold text-[#1E6B4A] hover:underline" id="signup-link">
+                  Register here
+                </Link>
+              </p>
 
-              {/* Password */}
-              <div className="space-y-1.5">
-                <div className="flex justify-between items-center">
-                  <label className="text-xs font-bold text-stone-700 uppercase tracking-wider">
-                    Password
-                  </label>
-                  <button
-                    type="button"
-                    onClick={() => setResetting(true)}
-                    className="text-xs font-semibold text-amber-700 hover:text-amber-800 transition"
-                  >
-                    Forgot Password?
-                  </button>
-                </div>
-                <div className="relative">
-                  <KeyRound className="absolute left-3.5 top-3 h-5 w-5 text-stone-400" />
-                  <input
-                    type="password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="••••••••"
-                    className="w-full pl-11 pr-4 py-2.5 rounded-xl border border-stone-300 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500 text-sm"
-                    required
-                  />
-                </div>
-              </div>
-            </div>
+            </form>
+          )}
 
-            {/* Submit */}
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full flex items-center justify-center space-x-2 py-3 px-4 text-sm font-bold bg-amber-600 hover:bg-amber-700 text-white rounded-xl shadow-lg shadow-amber-600/10 transition duration-150 disabled:opacity-50"
-            >
-              {loading ? (
-                <div className="h-5 w-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-              ) : (
-                <>
-                  <LogIn className="h-5 w-5" />
-                  <span>Sign In with Email</span>
-                </>
-              )}
-            </button>
-
-            {/* Divider */}
-            <div className="relative my-4">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-stone-200"></div>
-              </div>
-              <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-white px-2 text-stone-400 font-bold tracking-wider">
-                  Or continue with
-                </span>
-              </div>
-            </div>
-
-            {/* Google Login */}
-            <button
-              type="button"
-              onClick={handleGoogleSignIn}
-              className="w-full flex items-center justify-center space-x-2 py-2.5 px-4 border border-stone-300 rounded-xl text-stone-700 hover:bg-stone-50 font-semibold text-sm transition"
-            >
-              <svg className="h-5 w-5 mr-1" viewBox="0 0 24 24">
-                <path
-                  fill="#EA4335"
-                  d="M12.24 10.285V14.4h6.887c-.275 1.565-1.88 4.604-6.887 4.604-4.33 0-7.859-3.578-7.859-8s3.53-8 7.859-8c2.46 0 4.105 1.025 5.047 1.926l3.258-3.133C18.332 2.117 15.454 1 12.24 1 6.133 1 1.152 5.922 1.152 12s4.98 11 11.088 11c6.37 0 10.596-4.474 10.596-10.76 0-.726-.078-1.282-.175-1.955H12.24z"
-                />
-              </svg>
-              <span>Sign In with Google</span>
-            </button>
-
-            {/* Signup Link */}
-            <p className="text-center text-xs sm:text-sm text-stone-600 font-medium pt-2">
-              Don't have an account yet?{" "}
-              <Link to="/signup" className="font-bold text-amber-700 hover:text-amber-800 hover:underline">
-                Register here
-              </Link>
+          {/* KENYAN CONTEXT INFO BOX */}
+          <div className="bg-[#F0FDF4] border border-[#A7F3D0] rounded-xl p-3.5 flex items-start space-x-2.5 shadow-2xs" id="kenyan-context-box">
+            <span className="text-base shrink-0">🇰🇪</span>
+            <p className="text-[13px] text-[#065F46] font-medium leading-relaxed">
+              M-Pesa payments accepted · Listings from KES 100 · Active across Nairobi, Mombasa & beyond
             </p>
-          </form>
-        )}
+          </div>
+
+          {/* Styled Footer */}
+          <div className="pt-6 border-t border-stone-100 text-center space-y-2" id="login-footer">
+            <p className="text-xs text-stone-400 font-medium">
+              © 2026 Nestlist Rental Platforms Limited
+            </p>
+            <div className="flex justify-center space-x-3 text-xs text-stone-400 font-medium">
+              <a href="#" className="hover:text-stone-600 transition">Terms</a>
+              <span>·</span>
+              <a href="#" className="hover:text-stone-600 transition">Privacy</a>
+              <span>·</span>
+              <a href="#" className="hover:text-stone-600 transition">Support</a>
+            </div>
+          </div>
+
+        </div>
 
       </div>
+
     </div>
   );
 };
