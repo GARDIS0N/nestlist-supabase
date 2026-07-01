@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { supabase } from "../lib/supabase";
+import { uploadAvatar } from "../lib/storage";
 import { User, Phone, CheckCircle2, AlertCircle, Camera, Loader2, Trash2 } from "lucide-react";
 
 export const Onboarding: React.FC = () => {
@@ -50,62 +51,26 @@ export const Onboarding: React.FC = () => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Validate type (JPG, PNG, WEBP)
-    const allowedTypes = ["image/jpeg", "image/png", "image/webp", "image/jpg"];
-    if (!allowedTypes.includes(file.type)) {
-      alert("Only JPG, PNG, and WEBP images are allowed.");
-      return;
-    }
-
-    // Validate size (max 5MB)
-    if (file.size > 5 * 1024 * 1024) {
-      alert("Avatar image file size must be less than 5MB.");
-      return;
-    }
-
     setAvatarUploading(true);
     try {
-      const sanitizedFileName = file.name.replace(/[^a-zA-Z0-9_.-]/g, "_");
-      const filePath = `${session.user.id}/${Date.now()}-${sanitizedFileName}`;
-
-      // Validate path on frontend before upload to prevent uploading to another user's folder
-      if (!filePath.startsWith(session.user.id + "/")) {
-        throw new Error("Unauthorized file path: destination must reside in your user folder.");
-      }
-
-      const { error: uploadErr } = await supabase.storage
-        .from("App-files")
-        .upload(filePath, file, {
-          cacheControl: "3600",
-          upsert: true,
-        });
-
-      if (uploadErr) throw uploadErr;
-
-      const { data } = supabase.storage
-        .from("App-files")
-        .getPublicUrl(filePath);
-
-      if (data?.publicUrl) {
-        // Append a cache-busting query parameter to prevent caching issues
-        const busterUrl = `${data.publicUrl}?t=${Date.now()}`;
-        setAvatarUrl(busterUrl);
-        
-        // If profile exists and is editing, write to db immediately
-        if (profile) {
-          await supabase
-            .from("profiles")
-            .update({ avatar_url: busterUrl })
-            .eq("id", session.user.id);
-          await refreshProfile();
-        }
+      const publicUrl = await uploadAvatar(file, session.user.id);
+      
+      const busterUrl = `${publicUrl}?t=${Date.now()}`;
+      setAvatarUrl(busterUrl);
+      
+      // If profile exists and is editing, write to db immediately
+      if (profile) {
+        await supabase
+          .from("profiles")
+          .update({ avatar_url: busterUrl })
+          .eq("id", session.user.id);
+        await refreshProfile();
       }
     } catch (err: any) {
       console.error("Avatar upload failed:", err);
       alert(`Avatar upload failed: ${err.message || "Unknown error"}`);
     } finally {
       setAvatarUploading(false);
-      // Reset input value to allow uploading same/different images seamlessly
       if (e.target) {
         e.target.value = "";
       }
@@ -115,26 +80,10 @@ export const Onboarding: React.FC = () => {
   const handleAvatarRemove = async () => {
     if (!session?.user?.id || !avatarUrl) return;
 
-    const getPathFromUrl = (url: string): string | null => {
-      const bucketToken = "App-files/";
-      const idx = url.indexOf(bucketToken);
-      if (idx !== -1) {
-        return decodeURIComponent(url.substring(idx + bucketToken.length));
-      }
-      return null;
-    };
-
-    const filePath = getPathFromUrl(avatarUrl);
-    if (filePath) {
-      if (!filePath.startsWith(session.user.id + "/")) {
-        console.warn("Unauthorized delete attempt on avatar.");
-        return;
-      }
-      try {
-        await supabase.storage.from("App-files").remove([filePath]);
-      } catch (err) {
-        console.error("Failed to delete avatar from storage:", err);
-      }
+    try {
+      await supabase.storage.from("nestlist-images").remove([`profiles/${session.user.id}/avatar.jpg`]);
+    } catch (err) {
+      console.error("Failed to delete avatar from storage:", err);
     }
 
     setAvatarUrl(null);

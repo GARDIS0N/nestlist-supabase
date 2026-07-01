@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { supabase } from "../lib/supabase";
-import { ImageUploader } from "../components/ImageUploader";
+import { PhotoUpload } from "../components/PhotoUpload";
 import { MapPin, CheckSquare, Sparkles, Building, Landmark, ChevronRight, ChevronLeft, Loader2, CreditCard, ShieldCheck, Check, Clock, Phone, AlertTriangle, X, Hash } from "lucide-react";
 
 const COUNTIES = ["Nairobi", "Kiambu", "Mombasa", "Kisumu", "Nakuru"];
@@ -35,6 +35,7 @@ export const ListProperty: React.FC = () => {
 
   // Property Form State
   const [propertyId, setPropertyId] = useState<string | null>(null);
+  const [tempId] = useState(() => "temp-" + Math.random().toString(36).slice(2, 10));
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [locationName, setLocationName] = useState("");
@@ -415,7 +416,7 @@ export const ListProperty: React.FC = () => {
             <span>Step 3: Property Images</span>
           </h2>
 
-          <ImageUploader onImagesUploaded={(urls) => setUploadedImages(urls)} existingImages={uploadedImages} propertyId={propertyId || undefined} />
+          <PhotoUpload propertyId={propertyId || tempId} photos={uploadedImages} onChange={(urls) => setUploadedImages(urls)} />
 
           <div className="flex justify-between pt-5 border-t border-stone-100">
             <button
