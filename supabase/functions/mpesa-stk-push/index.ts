@@ -84,7 +84,7 @@ serve(async (req) => {
         };
 
         const stkResponse = await fetch(
-          "https://sandbox.safaricom.co.ke/mpesa/stkpush/v1/query", // Sandbox endpoint or live endpoint
+          "https://sandbox.safaricom.co.ke/mpesa/stkpush/v1/processrequest", // Sandbox endpoint or live endpoint
           {
             method: "POST",
             headers: {
