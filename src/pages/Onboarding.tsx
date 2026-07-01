@@ -24,7 +24,9 @@ export const Onboarding: React.FC = () => {
   useEffect(() => {
     // If user already has a complete profile and is NOT in editing mode, redirect to correct starting page
     if (!isEditing && profile && profile.role) {
-      if (profile.role === "landlord") {
+      if (profile.role === "admin") {
+        navigate("/admin", { replace: true });
+      } else if (profile.role === "landlord") {
         navigate("/dashboard", { replace: true });
       } else {
         navigate("/", { replace: true });

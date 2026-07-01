@@ -16,18 +16,36 @@ export const Admin: React.FC = () => {
   const [smsLogs, setSmsLogs] = useState<any[]>([]);
 
   // Checking Admin Authorization
-  // Admin email is standard thesilentwhisper.ke@gmail.com
-  const authorized = profile?.id === "admin-1" || profile?.id === "landlord-1" || profile?.full_name === "Peter Kamau";
+  const authorized = profile?.role === "admin" || profile?.id === "admin-1" || profile?.id === "42eca9a0-c070-4898-b830-46c3247ea71d";
 
   const fetchAdminData = async () => {
     setLoading(true);
     try {
-      // 1. Fetch payments
-      const { data: payData } = await supabase
+      // 1. Fetch manual payment submissions from listing_payments
+      const { data: lpData } = await supabase
         .from("listing_payments")
-        .select("*, landlord:profiles!listing_payments_landlord_id_fkey(full_name, phone), property:properties(title)")
+        .select("*, landlord:profiles(full_name, phone), property:properties(title)")
         .order("created_at", { ascending: false });
-      setPayments(payData || []);
+
+      // Map listing_payments data into legacy property shapes for Admin page compatibility
+      const mappedPayments = (lpData || []).map((p: any) => ({
+        id: p.property_id,
+        title: p.property?.title || "Property Listing",
+        landlord: p.landlord,
+        amount_paid: p.amount_paid || p.amount,
+        mpesa_code: p.mpesa_code,
+        mpesa_phone: p.payer_phone,
+        payment_status: p.status === "confirmed"
+          ? "verified"
+          : p.status === "pending"
+            ? "pending_verification"
+            : p.status === "failed"
+              ? "rejected"
+              : "unpaid",
+        rejection_reason: p.failure_reason,
+        submitted_at: p.created_at
+      }));
+      setPayments(mappedPayments);
 
       // 2. Fetch properties (all)
       const { data: propData } = await supabase
@@ -63,34 +81,92 @@ export const Admin: React.FC = () => {
     }
   }, [profile, authorized]);
 
-  const handleApprovePayment = async (paymentId: string, propertyId: string) => {
+  const handleApprovePayment = async (propertyId: string) => {
     try {
-      // Simulate Service Role updates to payment row
-      // Confirms payment and triggers activation via database functions
-      const mpesaCode = `ADM${Math.random().toString(36).substr(2, 7).toUpperCase()}`;
-      
-      const { error } = await supabase
+      // Call backend verification endpoint
+      const response = await fetch(`/api/admin/payments/${propertyId}/verify`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ admin_id: profile?.id || "admin-1" })
+      });
+
+      const resData = await response.json();
+      if (!response.ok) {
+        throw new Error(resData.error || "Failed to approve payment on backend.");
+      }
+
+      // Sync frontend database client locally
+      const { error: lpErr } = await supabase
         .from("listing_payments")
         .update({
           status: "confirmed",
-          mpesa_code: mpesaCode,
-          amount_paid: 200, // mock amount
           confirmed_at: new Date().toISOString()
         })
-        .eq("id", paymentId);
+        .eq("property_id", propertyId);
 
-      if (error) throw error;
+      if (lpErr) console.error("Client side listing_payments sync failed:", lpErr);
 
-      // Force listing activation as well
-      await supabase
+      const { error: propErr } = await supabase
         .from("properties")
-        .update({ is_active: true, expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() })
+        .update({
+          is_active: true,
+          expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
+        })
         .eq("id", propertyId);
 
-      // Reload
+      if (propErr) console.error("Client side properties sync failed:", propErr);
+
+      alert("Payment verified successfully. Listing is now live!");
       fetchAdminData();
     } catch (err: any) {
       alert(`Approval failed: ${err.message}`);
+    }
+  };
+
+  const handleRejectPayment = async (propertyId: string) => {
+    const reason = prompt("Enter payment rejection reason:", "M-Pesa transaction reference code could not be verified on our statement.");
+    if (reason === null) return; // Prompt cancelled
+
+    try {
+      // Call backend rejection endpoint
+      const response = await fetch(`/api/admin/payments/${propertyId}/reject`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          admin_id: profile?.id || "admin-1",
+          reason: reason
+        })
+      });
+
+      const resData = await response.json();
+      if (!response.ok) {
+        throw new Error(resData.error || "Failed to reject payment on backend.");
+      }
+
+      // Sync frontend database client locally
+      const { error: lpErr } = await supabase
+        .from("listing_payments")
+        .update({
+          status: "failed",
+          failure_reason: reason
+        })
+        .eq("property_id", propertyId);
+
+      if (lpErr) console.error("Client side listing_payments sync failed:", lpErr);
+
+      const { error: propErr } = await supabase
+        .from("properties")
+        .update({
+          is_active: false
+        })
+        .eq("id", propertyId);
+
+      if (propErr) console.error("Client side properties sync failed:", propErr);
+
+      alert("Payment verification rejected successfully.");
+      fetchAdminData();
+    } catch (err: any) {
+      alert(`Rejection failed: ${err.message}`);
     }
   };
 
@@ -112,6 +188,74 @@ export const Admin: React.FC = () => {
       );
     } catch (err: any) {
       alert(`Toggle failed: ${err.message}`);
+    }
+  };
+
+  const handleDeleteProperty = async (propertyId: string) => {
+    if (!window.confirm("Are you sure you want to delete this listing permanently? This action cannot be undone.")) return;
+    try {
+      const { error } = await supabase
+        .from("properties")
+        .delete()
+        .eq("id", propertyId);
+
+      if (error) throw error;
+
+      setProperties(prev => prev.filter(p => p.id !== propertyId));
+      alert("Listing deleted successfully.");
+    } catch (err: any) {
+      alert(`Deletion failed: ${err.message}`);
+    }
+  };
+
+  const handleDeleteUser = async (userId: string) => {
+    if (userId === "admin-1" || userId === profile?.id) {
+      alert("You cannot delete yourself or the main system administrator account.");
+      return;
+    }
+    if (!window.confirm("Are you sure you want to delete this user profile permanently? All associated listings and alerts will be removed.")) return;
+    try {
+      const { error } = await supabase
+        .from("profiles")
+        .delete()
+        .eq("id", userId);
+
+      if (error) throw error;
+
+      setUsers(prev => prev.filter(u => u.id !== userId));
+      alert("User profile deleted successfully.");
+    } catch (err: any) {
+      alert(`Deletion failed: ${err.message}`);
+    }
+  };
+
+  const handleToggleUserRole = async (userId: string, currentRole: string) => {
+    if (userId === "admin-1" || userId === profile?.id) {
+      alert("You cannot modify your own role or the main system administrator account.");
+      return;
+    }
+    
+    // Rotate through roles: tenant -> landlord -> user -> admin
+    const nextRole = currentRole === "tenant" 
+      ? "landlord" 
+      : currentRole === "landlord" 
+        ? "user" 
+        : currentRole === "user" 
+          ? "admin" 
+          : "tenant";
+
+    try {
+      const { error } = await supabase
+        .from("profiles")
+        .update({ role: nextRole })
+        .eq("id", userId);
+
+      if (error) throw error;
+
+      setUsers(prev => prev.map(u => u.id === userId ? { ...u, role: nextRole } : u));
+      alert(`User role updated to "${nextRole}" successfully.`);
+    } catch (err: any) {
+      alert(`Role change failed: ${err.message}`);
     }
   };
 
@@ -225,42 +369,61 @@ export const Admin: React.FC = () => {
               <tbody className="divide-y divide-stone-150">
                 {payments.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="p-8 text-center text-stone-400 font-medium">No transactions registered yet.</td>
+                    <td colSpan={6} className="p-8 text-center text-stone-400 font-medium">No manual payment transactions registered yet.</td>
                   </tr>
                 ) : (
                   payments.map((p) => (
                     <tr key={p.id} className="hover:bg-stone-50/50">
                       <td className="p-4">
-                        <p className="font-bold text-stone-900">{p.landlord?.full_name}</p>
-                        <p className="text-stone-400 text-[10px]">{p.landlord?.phone}</p>
+                        <p className="font-bold text-stone-900">{p.landlord?.full_name || "Landlord"}</p>
+                        <p className="text-stone-400 text-[10px]">{p.landlord?.phone || "N/A"}</p>
                       </td>
                       <td className="p-4 max-w-xs truncate font-medium text-stone-700">
-                        {p.property?.title || "Property Listing"}
+                        {p.title || "Property Listing"}
                       </td>
-                      <td className="p-4 font-mono font-bold">KSh {parseFloat(p.amount).toLocaleString()}</td>
+                      <td className="p-4 font-mono font-bold text-emerald-700">
+                        KSh {(parseFloat(p.amount_paid) || 0).toLocaleString()}
+                      </td>
                       <td className="p-4">
                         <p className="font-mono text-xs font-bold text-stone-850">{p.mpesa_code || "N/A"}</p>
-                        <p className="text-[10px] text-stone-400 font-mono truncate max-w-[150px]">{p.mpesa_checkout_request_id}</p>
+                        {p.mpesa_phone && (
+                          <p className="text-[10px] text-stone-400 font-mono">{p.mpesa_phone}</p>
+                        )}
                       </td>
                       <td className="p-4">
-                        <span className={`text-[10px] font-bold uppercase px-2.5 py-0.5 rounded-full ${
-                          p.status === "confirmed"
-                            ? "bg-emerald-50 text-emerald-700 border border-emerald-100"
-                            : p.status === "pending"
-                            ? "bg-amber-50 text-amber-700 border border-amber-100"
-                            : "bg-red-50 text-red-700 border border-red-100"
-                        }`}>
-                          {p.status}
-                        </span>
+                        <div className="space-y-1">
+                          <span className={`inline-block text-[10px] font-bold uppercase px-2.5 py-0.5 rounded-full ${
+                            p.payment_status === "verified"
+                              ? "bg-emerald-50 text-emerald-700 border border-emerald-100"
+                              : p.payment_status === "pending_verification"
+                              ? "bg-amber-50 text-amber-700 border border-amber-100 animate-pulse"
+                              : "bg-red-50 text-red-700 border border-red-100"
+                          }`}>
+                            {p.payment_status === "pending_verification" ? "pending verification" : p.payment_status}
+                          </span>
+                          {p.rejection_reason && (
+                            <p className="text-[10px] text-red-500 max-w-xs truncate" title={p.rejection_reason}>
+                              Reason: {p.rejection_reason}
+                            </p>
+                          )}
+                        </div>
                       </td>
                       <td className="p-4 text-right">
-                        {p.status === "pending" && (
-                          <button
-                            onClick={() => handleApprovePayment(p.id, p.property_id)}
-                            className="py-1 px-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-xs font-bold transition"
-                          >
-                            Force Confirm
-                          </button>
+                        {p.payment_status === "pending_verification" && (
+                          <div className="flex justify-end gap-2">
+                            <button
+                              onClick={() => handleApprovePayment(p.id)}
+                              className="py-1 px-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-xs font-bold transition shadow-sm"
+                            >
+                              Verify
+                            </button>
+                            <button
+                              onClick={() => handleRejectPayment(p.id)}
+                              className="py-1 px-2.5 bg-red-650 hover:bg-red-700 text-white rounded text-xs font-bold transition shadow-sm"
+                            >
+                              Reject
+                            </button>
+                          </div>
                         )}
                       </td>
                     </tr>
@@ -282,6 +445,7 @@ export const Admin: React.FC = () => {
                   <th className="p-4">County / Estate</th>
                   <th className="p-4">Rent</th>
                   <th className="p-4">Active State</th>
+                  <th className="p-4 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-stone-150">
@@ -309,6 +473,14 @@ export const Admin: React.FC = () => {
                         )}
                       </button>
                     </td>
+                    <td className="p-4 text-right">
+                      <button
+                        onClick={() => handleDeleteProperty(p.id)}
+                        className="py-1 px-2.5 bg-red-50 hover:bg-red-100 text-red-600 font-bold rounded text-xs transition shadow-xs"
+                      >
+                        Delete
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -326,6 +498,7 @@ export const Admin: React.FC = () => {
                   <th className="p-4">Phone Number</th>
                   <th className="p-4">Account Role</th>
                   <th className="p-4">Registered Date</th>
+                  <th className="p-4 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-stone-150">
@@ -334,15 +507,40 @@ export const Admin: React.FC = () => {
                     <td className="p-4 font-bold text-stone-900">{u.full_name}</td>
                     <td className="p-4 font-mono">{u.phone || "No phone connected"}</td>
                     <td className="p-4">
-                      <span className={`text-[10px] font-bold uppercase px-2.5 py-0.5 rounded-full ${
-                        u.role === "landlord"
-                          ? "bg-amber-100 text-amber-800"
-                          : "bg-stone-100 text-stone-700"
-                      }`}>
-                        {u.role}
-                      </span>
+                      <div className="flex items-center space-x-2">
+                        <span className={`text-[10px] font-bold uppercase px-2.5 py-0.5 rounded-full ${
+                          u.role === "admin"
+                            ? "bg-purple-100 text-purple-800"
+                            : u.role === "landlord"
+                              ? "bg-amber-100 text-amber-800"
+                              : u.role === "tenant"
+                                ? "bg-blue-100 text-blue-800"
+                                : "bg-stone-100 text-stone-700"
+                        }`}>
+                          {u.role}
+                        </span>
+                        {u.id !== "admin-1" && u.id !== profile?.id && (
+                          <button
+                            onClick={() => handleToggleUserRole(u.id, u.role)}
+                            className="text-[10px] text-amber-600 hover:text-amber-800 underline font-medium focus:outline-none"
+                            title="Rotate through roles: tenant -> landlord -> user -> admin"
+                          >
+                            Change Role
+                          </button>
+                        )}
+                      </div>
                     </td>
                     <td className="p-4 text-stone-400 text-xs">{new Date(u.created_at).toLocaleString()}</td>
+                    <td className="p-4 text-right">
+                      {u.id !== "admin-1" && u.id !== profile?.id && (
+                        <button
+                          onClick={() => handleDeleteUser(u.id)}
+                          className="py-1 px-2.5 bg-red-50 hover:bg-red-100 text-red-600 font-bold rounded text-xs transition"
+                        >
+                          Delete
+                        </button>
+                      )}
+                    </td>
                   </tr>
                 ))}
               </tbody>

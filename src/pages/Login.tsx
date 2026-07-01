@@ -244,6 +244,46 @@ export const Login: React.FC = () => {
         ) : (
           /* STANDARD LOGIN FORM */
           <form onSubmit={handleSignIn} className="space-y-5">
+            {/* Quick Demo Accounts */}
+            <div className="bg-amber-50/50 border border-amber-200/60 rounded-xl p-3.5 space-y-2.5">
+              <div className="flex items-center space-x-2 text-amber-950 font-bold text-[10px] uppercase tracking-wider">
+                <Sparkles className="h-3.5 w-3.5 text-amber-600 animate-pulse" />
+                <span>Quick Demo Accounts (1-Click Fill)</span>
+              </div>
+              <div className="grid grid-cols-3 gap-2 text-[11px]">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEmail("thesilentwhisper.ke@gmail.com");
+                    setPassword("password");
+                  }}
+                  className="flex flex-col items-center justify-center text-center p-2 bg-white hover:bg-amber-50/80 border border-stone-200/80 rounded-lg transition active:scale-[0.98] shadow-xs"
+                >
+                  <span className="font-bold text-stone-900">🛡️ Admin</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEmail("landlord1@nestlist.co.ke");
+                    setPassword("password");
+                  }}
+                  className="flex flex-col items-center justify-center text-center p-2 bg-white hover:bg-amber-50/80 border border-stone-200/80 rounded-lg transition active:scale-[0.98] shadow-xs"
+                >
+                  <span className="font-bold text-stone-900">🏢 Landlord</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEmail("tenant1@nestlist.co.ke");
+                    setPassword("password");
+                  }}
+                  className="flex flex-col items-center justify-center text-center p-2 bg-white hover:bg-amber-50/80 border border-stone-200/80 rounded-lg transition active:scale-[0.98] shadow-xs"
+                >
+                  <span className="font-bold text-stone-900">🏡 Tenant</span>
+                </button>
+              </div>
+            </div>
+
             <div className="space-y-4">
               {/* Email */}
               <div className="space-y-1.5">

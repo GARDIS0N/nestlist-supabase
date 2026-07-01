@@ -5,7 +5,7 @@ interface Profile {
   id: string;
   full_name: string;
   phone: string;
-  role: "landlord" | "tenant";
+  role: "landlord" | "tenant" | "user" | "admin";
   avatar_url: string | null;
   created_at: string;
 }
@@ -14,7 +14,7 @@ interface AuthContextType {
   session: any;
   profile: Profile | null;
   loading: boolean;
-  signUp: (email: string, password: string, fullName: string, phone: string, role: "landlord" | "tenant") => Promise<any>;
+  signUp: (email: string, password: string, fullName: string, phone: string, role: "landlord" | "tenant" | "user" | "admin") => Promise<any>;
   signIn: (email: string, password: string) => Promise<any>;
   signInWithGoogle: () => Promise<any>;
   signOut: () => Promise<any>;
@@ -59,35 +59,83 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   useEffect(() => {
-    // 1. Get initial session
+    let active = true;
+
+    // 1. Get initial session and load matching profiles row first
     const checkSession = async () => {
+      setLoading(true);
       try {
         const { data: { session: initialSession } } = await supabase.auth.getSession();
-        setSession(initialSession);
-        if (initialSession?.user?.id) {
-          await loadProfile(initialSession.user.id);
+        if (active) {
+          setSession(initialSession);
+          if (initialSession?.user?.id) {
+            // Load profile synchronously inside the initial setup phase
+            const { data, error } = await supabase
+              .from("profiles")
+              .select("*")
+              .eq("id", initialSession.user.id)
+              .maybeSingle();
+            
+            if (active) {
+              if (error) {
+                console.error("Error loading user profile on init:", error);
+                setProfile(null);
+              } else {
+                setProfile(data as Profile || null);
+              }
+            }
+          } else {
+            if (active) setProfile(null);
+          }
         }
       } catch (err) {
         console.error("Error during initial session check:", err);
       } finally {
-        setLoading(false);
+        if (active) {
+          setLoading(false);
+        }
       }
     };
 
     checkSession();
 
-    // 2. Setup auth listener
+    // 2. Setup auth listener to keep session and profile in sync
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, newSession) => {
-      setSession(newSession);
-      if (newSession?.user?.id) {
-        await loadProfile(newSession.user.id);
-      } else {
+      if (!active) return;
+
+      if (event === "SIGNED_OUT") {
+        setSession(null);
         setProfile(null);
+        setLoading(false);
+      } else if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED" || event === "USER_UPDATED") {
+        setLoading(true);
+        setSession(newSession);
+        if (newSession?.user?.id) {
+          const { data, error } = await supabase
+            .from("profiles")
+            .select("*")
+            .eq("id", newSession.user.id)
+            .maybeSingle();
+          
+          if (active) {
+            if (error) {
+              console.error("Error loading profile on auth state change:", error);
+              setProfile(null);
+            } else {
+              setProfile(data as Profile || null);
+            }
+          }
+        } else {
+          if (active) setProfile(null);
+        }
+        if (active) setLoading(false);
+      } else {
+        setSession(newSession);
       }
-      setLoading(false);
     });
 
     return () => {
+      active = false;
       subscription?.unsubscribe();
     };
   }, []);
@@ -98,7 +146,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     password: string,
     fullName: string,
     phone: string,
-    role: "landlord" | "tenant"
+    role: "landlord" | "tenant" | "user" | "admin"
   ) => {
     setLoading(true);
     try {

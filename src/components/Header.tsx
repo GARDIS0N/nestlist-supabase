@@ -10,8 +10,7 @@ export const Header: React.FC = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false);
 
   // Check if current user has the admin privilege
-  // Admin is specified by the silentwhisper email or hardcoded as Peter Kamau / grace for mock testing
-  const isAdmin = profile?.id === "admin-1" || profile?.id === "landlord-1" || profile?.full_name === "Peter Kamau";
+  const isAdmin = profile?.role === "admin" || profile?.id === "admin-1" || profile?.id === "42eca9a0-c070-4898-b830-46c3247ea71d";
 
   const handleSignOut = async () => {
     await signOut();

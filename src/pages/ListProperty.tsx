@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { supabase } from "../lib/supabase";
 import { ImageUploader } from "../components/ImageUploader";
-import { MapPin, CheckSquare, Sparkles, Building, Landmark, ChevronRight, ChevronLeft, Loader2, CreditCard, ShieldCheck, Check, Clock, Phone, AlertTriangle } from "lucide-react";
+import { MapPin, CheckSquare, Sparkles, Building, Landmark, ChevronRight, ChevronLeft, Loader2, CreditCard, ShieldCheck, Check, Clock, Phone, AlertTriangle, X, Hash } from "lucide-react";
 
 const COUNTIES = ["Nairobi", "Kiambu", "Mombasa", "Kisumu", "Nakuru"];
 
@@ -44,11 +44,11 @@ export const ListProperty: React.FC = () => {
   const [selectedAmenities, setSelectedAmenities] = useState<string[]>([]);
   const [uploadedImages, setUploadedImages] = useState<string[]>([]);
 
-  // Payment Processing State
+  // Payment Processing State (Manual M-Pesa Verification Flow)
   const [mpesaPhone, setMpesaPhone] = useState("");
+  const [mpesaCode, setMpesaCode] = useState("");
   const [paying, setPaying] = useState(false);
-  const [paymentStatus, setPaymentStatus] = useState<"idle" | "pending" | "confirmed" | "failed" | "cancelled">("idle");
-  const [countdown, setCountdown] = useState(60);
+  const [paymentStatus, setPaymentStatus] = useState<"idle" | "pending_verification" | "verified" | "rejected">("idle");
   const [paymentError, setPaymentError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -92,7 +92,7 @@ export const ListProperty: React.FC = () => {
     );
   };
 
-  // Step 4 Completion -> Insert raw property first in draft status
+  // Step 4 Completion -> Insert raw property first in draft status ('unpaid')
   const handleSavePropertyDraft = async () => {
     if (!profile) return;
     setPaying(true);
@@ -112,13 +112,27 @@ export const ListProperty: React.FC = () => {
             type: selectedType,
             amenities: selectedAmenities,
             images: uploadedImages,
-            is_active: false,
+            is_active: false
           })
           .select()
           .single();
 
         if (error) throw error;
         setPropertyId(data.id);
+
+        // Sync with backend mock database file if running in mock simulator mode
+        const { getSupabaseConfig } = await import("../lib/supabase");
+        if (getSupabaseConfig().isMock) {
+          try {
+            await fetch("/api/mock/sync-property", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(data)
+            });
+          } catch (syncErr) {
+            console.warn("Backend mock sync failed:", syncErr);
+          }
+        }
       }
       // Advance to payment step
       setStep(5);
@@ -130,118 +144,59 @@ export const ListProperty: React.FC = () => {
     }
   };
 
-  // Step 5 Checkout -> Trigger Daraja STK Push and subscribe to realtime updates
-  const handleInitiateSTKPush = async (e: React.FormEvent) => {
+  // Step 5 Submit Manual Payment -> Post M-Pesa Code to backend verification endpoint
+  const handleSubmitManualPayment = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!profile || !propertyId || !mpesaPhone) return;
+    if (!profile || !propertyId || !mpesaCode) return;
 
     setPaying(true);
     setPaymentError(null);
-    setPaymentStatus("pending");
-    setCountdown(60);
 
     const fee = getListingFee(selectedType);
 
     try {
-      // 1. Invoke STK push Edge Function
-      const { data, error } = await supabase.functions.invoke("mpesa-stk-push", {
-        body: {
-          propertyId: propertyId,
-          landlordId: profile.id,
-          phone: mpesaPhone,
-          amount: fee,
-          propertyType: selectedType,
-        }
+      // 1. Post to Express Backend manual verification API
+      const response = await fetch(`/api/listings/${propertyId}/payment`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          mpesa_code: mpesaCode,
+          mpesa_phone: mpesaPhone,
+          amount_paid: fee
+        })
       });
 
-      if (error) throw error;
+      const resData = await response.json();
 
-      const checkoutRequestId = data?.checkout_request_id;
-      const paymentId = data?.payment_id;
-
-      if (!checkoutRequestId || !paymentId) {
-        throw new Error("Daraja did not return transaction identifiers.");
+      if (!response.ok) {
+        throw new Error(resData.error || "Could not submit payment code. Please check code format.");
       }
 
-      // 2. Setup Realtime subscription or Polling interval
-      // Since HMR is disabled, let's subscribe to listing_payments change events
-      const channel = supabase
-        .channel(`payment-${paymentId}`)
-        .on(
-          "postgres_changes" as any,
-          {
-            event: "UPDATE",
-            schema: "public",
-            table: "listing_payments",
-            filter: `id=eq.${paymentId}`,
-          },
-          (payload: any) => {
-            console.log("Realtime Payment Update received:", payload);
-            const updatedRow = payload.new;
-            if (updatedRow && updatedRow.status) {
-              setPaymentStatus(updatedRow.status);
-              if (updatedRow.status === "confirmed") {
-                setPaying(false);
-              } else if (updatedRow.status === "failed" || updatedRow.status === "cancelled") {
-                setPaying(false);
-                setPaymentError(updatedRow.failure_reason || "Transaction cancelled by user.");
-              }
-            }
-          }
-        )
-        .subscribe();
-
-      // Start Countdown Timer
-      const timer = setInterval(() => {
-        setCountdown((prev) => {
-          if (prev <= 1) {
-            clearInterval(timer);
-            // Polling fallback to check DB status if realtime lags
-            checkPaymentStatusFallback(paymentId);
-            return 0;
-          }
-          return prev - 1;
-        });
-      }, 1000);
-
-      // Clean up subscription channel on completion/timeout
-      return () => {
-        clearInterval(timer);
-        channel.unsubscribe();
-      };
-
-    } catch (err: any) {
-      console.error("Payment initiation failed:", err);
-      setPaymentStatus("failed");
-      setPaymentError(err.message || "Connection to Daraja Gateway failed.");
-      setPaying(false);
-    }
-  };
-
-  // Fallback Polling method if websocket is disconnected
-  const checkPaymentStatusFallback = async (paymentId: string) => {
-    try {
-      const { data } = await supabase
+      // 2. Synchronize frontend local client (localStorage / Supabase Simulator)
+      const { error } = await supabase
         .from("listing_payments")
-        .select("status, failure_reason")
-        .eq("id", paymentId)
-        .single();
+        .insert({
+          property_id: propertyId,
+          landlord_id: profile.id,
+          amount: fee,
+          property_type: selectedType,
+          mpesa_code: mpesaCode.trim().toUpperCase(),
+          mpesa_checkout_request_id: `MANUAL-${propertyId}-${mpesaCode.trim().toUpperCase()}`,
+          amount_paid: fee,
+          payer_phone: mpesaPhone || null,
+          status: "pending"
+        });
 
-      if (data) {
-        setPaymentStatus(data.status);
-        if (data.status === "confirmed") {
-          setPaying(false);
-        } else if (data.status === "failed" || data.status === "cancelled") {
-          setPaymentError(data.failure_reason || "Verification timed out.");
-          setPaying(false);
-        } else {
-          // If still pending, simulate a successful confirmation for mock playground
-          setPaymentStatus("confirmed");
-          setPaying(false);
-        }
+      if (error) {
+        console.error("Failed to update local property state:", error);
       }
-    } catch (err) {
-      console.error("Fallback query failed:", err);
+
+      setPaymentStatus("pending_verification");
+    } catch (err: any) {
+      console.error("Payment submission failed:", err);
+      setPaymentError(err.message || "Connection to verification server failed.");
+    } finally {
+      setPaying(false);
     }
   };
 
@@ -535,14 +490,14 @@ export const ListProperty: React.FC = () => {
         </div>
       )}
 
-      {/* STEP 5: M-PESA CHECKOUT PORTAL */}
+      {/* STEP 5: MANUAL M-PESA CHECKOUT PORTAL */}
       {step === 5 && (
-        <div className="space-y-6 bg-white p-8 rounded-2xl border border-amber-200 shadow-xl shadow-amber-50/20 relative overflow-hidden">
+        <div className="space-y-6 bg-white p-8 rounded-2xl border border-stone-200 shadow-xl relative overflow-hidden">
           {/* Cover glow */}
-          <div className="absolute top-0 right-0 h-48 w-48 bg-emerald-500/5 rounded-full blur-2xl"></div>
+          <div className="absolute top-0 right-0 h-48 w-48 bg-amber-500/5 rounded-full blur-2xl"></div>
 
-          {paymentStatus === "confirmed" ? (
-            /* CONGRATULATIONS PAGE */
+          {paymentStatus === "verified" ? (
+            /* CONGRATULATIONS / VERIFIED PAGE */
             <div className="text-center py-6 space-y-5 animate-fade-in">
               <div className="mx-auto h-16 w-16 bg-emerald-50 text-emerald-600 border-2 border-emerald-300 rounded-full flex items-center justify-center shadow-lg">
                 <Check className="h-9 w-9 stroke-[3]" />
@@ -551,7 +506,7 @@ export const ListProperty: React.FC = () => {
               <div className="space-y-2">
                 <h2 className="text-2xl font-black text-stone-950 font-sans">Listing Activated!</h2>
                 <p className="text-stone-500 text-sm leading-relaxed max-w-sm mx-auto">
-                  Hongera! We received your listing fee of <span className="font-bold text-stone-900">KSh {getListingFee(selectedType)}</span>. Your property has been activated for 30 days and matching alert subscribers are notified via SMS!
+                  Hongera! We verified your manual payment of <span className="font-bold text-stone-900">KSh {getListingFee(selectedType)}</span>. Your property listing is now live on NestList and alert subscribers have been notified!
                 </p>
               </div>
 
@@ -570,16 +525,78 @@ export const ListProperty: React.FC = () => {
                 </button>
               </div>
             </div>
+          ) : paymentStatus === "pending_verification" ? (
+            /* PENDING REVIEW PAGE */
+            <div className="text-center py-6 space-y-5 animate-fade-in">
+              <div className="mx-auto h-16 w-16 bg-amber-50 text-amber-600 border-2 border-amber-300 rounded-full flex items-center justify-center shadow-lg animate-pulse">
+                <Clock className="h-9 w-9" />
+              </div>
+
+              <div className="space-y-2">
+                <h2 className="text-2xl font-black text-stone-950 font-sans">Verification in Progress</h2>
+                <p className="text-stone-500 text-sm leading-relaxed max-w-sm mx-auto">
+                  Your payment submission is received! Our administrators are manually cross-referencing your code <span className="font-mono font-bold text-stone-950">{mpesaCode.toUpperCase()}</span>.
+                </p>
+                <div className="bg-amber-50/50 border border-amber-100 rounded-xl p-4 text-xs text-amber-900 font-medium max-w-md mx-auto mt-4 space-y-1">
+                  <p>✓ Code Submitted: {mpesaCode.toUpperCase()}</p>
+                  <p>✓ Amount to Verify: KSh {getListingFee(selectedType)}</p>
+                  <p className="text-stone-500 font-normal pt-1">
+                    Manual verification takes between 1 to 2 hours during normal business hours. Your listing will automatically go live once approved!
+                  </p>
+                </div>
+              </div>
+
+              <div className="pt-4 flex items-center justify-center gap-3">
+                <button
+                  onClick={() => navigate("/dashboard")}
+                  className="py-3 px-6 bg-stone-900 hover:bg-stone-800 text-white font-bold text-sm rounded-xl shadow transition"
+                >
+                  Go to Dashboard
+                </button>
+              </div>
+            </div>
+          ) : paymentStatus === "rejected" ? (
+            /* REJECTED STATE */
+            <div className="text-center py-6 space-y-5 animate-fade-in">
+              <div className="mx-auto h-16 w-16 bg-red-50 text-red-600 border-2 border-red-300 rounded-full flex items-center justify-center shadow-lg">
+                <X className="h-9 w-9" />
+              </div>
+
+              <div className="space-y-2">
+                <h2 className="text-2xl font-black text-stone-950 font-sans">Verification Rejected</h2>
+                <p className="text-stone-500 text-sm leading-relaxed max-w-sm mx-auto">
+                  Our administrators could not verify your manual transaction code.
+                </p>
+                <div className="bg-red-50 border border-red-100 rounded-xl p-4 text-xs text-red-800 font-medium max-w-md mx-auto">
+                  <p className="font-bold">Reason for rejection:</p>
+                  <p className="text-stone-600 font-normal mt-1">
+                    The provided transaction reference code is incorrect or could not be found on our statement.
+                  </p>
+                </div>
+              </div>
+
+              <div className="pt-4">
+                <button
+                  onClick={() => {
+                    setPaymentStatus("idle");
+                    setMpesaCode("");
+                  }}
+                  className="py-3 px-6 bg-stone-900 hover:bg-stone-800 text-white font-bold text-sm rounded-xl shadow transition"
+                >
+                  Re-submit Confirmation Code
+                </button>
+              </div>
+            </div>
           ) : (
-            /* ACTIVE TRANSACTION PAYMENT BOX */
+            /* ACTIVE MANUAL PAYMENT SUBMISSION BOX */
             <div className="space-y-6">
               <div className="flex items-center space-x-3 border-b border-stone-100 pb-4">
                 <div className="h-10 w-10 bg-emerald-100 text-emerald-600 rounded-xl flex items-center justify-center font-bold">
                   M
                 </div>
                 <div>
-                  <h2 className="text-lg font-extrabold text-stone-900 leading-tight">M-Pesa Express Checkout</h2>
-                  <p className="text-xs text-stone-400 font-semibold uppercase tracking-wider">Daraja STK Push Billing</p>
+                  <h2 className="text-lg font-extrabold text-stone-900 leading-tight">Manual M-Pesa Payment</h2>
+                  <p className="text-xs text-stone-400 font-semibold uppercase tracking-wider">Paybill Verification Flow</p>
                 </div>
               </div>
 
@@ -595,76 +612,97 @@ export const ListProperty: React.FC = () => {
                 </div>
               </div>
 
-              {paymentStatus === "pending" ? (
-                /* WAITING ANIMATION & COUNTDOWN TIMER */
-                <div className="text-center py-8 space-y-4 animate-pulse">
-                  <div className="mx-auto h-12 w-12 border-4 border-emerald-600 border-t-transparent rounded-full animate-spin"></div>
-                  
-                  <div className="space-y-1">
-                    <p className="text-sm font-bold text-stone-950">Awaiting M-Pesa PIN Entry...</p>
-                    <p className="text-xs text-stone-500 max-w-xs mx-auto">
-                      Check your Safaricom phone. We triggered a secure STK Push requesting your PIN to finalize KSh {getListingFee(selectedType)}.
-                    </p>
+              {/* PAYBILL INSTRUCTIONS PANEL */}
+              <div className="bg-amber-50/40 rounded-xl border border-amber-150 p-5 space-y-4">
+                <h3 className="text-stone-900 font-extrabold text-xs uppercase tracking-wider">M-Pesa Payment Steps:</h3>
+                <div className="grid grid-cols-2 gap-4 pb-1">
+                  <div className="bg-white border border-amber-200/60 p-3 rounded-lg text-center">
+                    <p className="text-[10px] text-stone-400 uppercase font-bold">Paybill Number</p>
+                    <p className="text-lg font-mono font-black text-amber-900">247247</p>
                   </div>
+                  <div className="bg-white border border-amber-200/60 p-3 rounded-lg text-center">
+                    <p className="text-[10px] text-stone-400 uppercase font-bold">Account Number</p>
+                    <p className="text-sm font-mono font-extrabold text-stone-950 truncate">0715185037</p>
+                  </div>
+                </div>
+                <ol className="text-xs text-stone-600 space-y-2 list-decimal pl-4 leading-normal">
+                  <li>Go to your M-Pesa menu and select <span className="font-bold">Lipa na M-Pesa</span>.</li>
+                  <li>Select <span className="font-bold">Paybill</span> and enter Business Number <span className="font-bold text-stone-950">247247</span>.</li>
+                  <li>Enter Account Number <span className="font-bold text-stone-950">0715185037</span>.</li>
+                  <li>Enter the exact amount of <span className="font-bold text-emerald-700">KSh {getListingFee(selectedType)}</span>.</li>
+                  <li>Complete the payment and wait for the Safaricom confirmation SMS.</li>
+                  <li>Enter the 10-character transaction code below to submit for validation.</li>
+                </ol>
+              </div>
 
-                  <div className="inline-block py-1.5 px-3 bg-stone-900 text-amber-400 text-sm font-mono font-black rounded-lg">
-                    Verification timeout: {countdown}s
+              {/* MANUAL PAYMENT SUBMISSION FORM */}
+              <form onSubmit={handleSubmitManualPayment} className="space-y-5">
+                {paymentError && (
+                  <div className="p-4 bg-red-50 text-red-800 border border-red-150 rounded-xl text-xs sm:text-sm font-medium flex items-start space-x-2">
+                    <AlertTriangle className="h-5 w-5 text-red-500 shrink-0 mt-0.5" />
+                    <p className="leading-relaxed">{paymentError}</p>
                   </div>
-                  
+                )}
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-stone-700 uppercase tracking-wider block">
+                    M-Pesa Confirmation Code (Required)
+                  </label>
+                  <div className="relative">
+                    <Hash className="absolute left-3.5 top-3.5 h-4.5 w-4.5 text-stone-400" />
+                    <input
+                      type="text"
+                      value={mpesaCode}
+                      onChange={(e) => setMpesaCode(e.target.value)}
+                      placeholder="e.g. QBG582Y78X"
+                      maxLength={12}
+                      className="w-full pl-10 pr-4 py-3 border border-stone-300 rounded-xl text-sm font-mono uppercase focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
+                      required
+                    />
+                  </div>
                   <p className="text-[10px] text-stone-400">
-                    If HMR or networks delay the webhook, the system will auto-activate upon countdown completion.
+                    Enter the exact transaction reference code from your Safaricom SMS.
                   </p>
                 </div>
-              ) : (
-                /* MPESA FORM */
-                <form onSubmit={handleInitiateSTKPush} className="space-y-5">
-                  {paymentError && (
-                    <div className="p-4 bg-red-50 text-red-800 border border-red-150 rounded-xl text-xs sm:text-sm font-medium flex items-start space-x-2">
-                      <AlertTriangle className="h-5 w-5 text-red-500 shrink-0 mt-0.5" />
-                      <p className="leading-relaxed">{paymentError}</p>
-                    </div>
-                  )}
 
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-stone-700 uppercase tracking-wider block">
-                      Enter M-Pesa Phone Number
-                    </label>
-                    <div className="relative">
-                      <Phone className="absolute left-3.5 top-3.5 h-4.5 w-4.5 text-stone-400" />
-                      <input
-                        type="tel"
-                        value={mpesaPhone}
-                        onChange={(e) => setMpesaPhone(e.target.value)}
-                        placeholder="e.g. 0712345678"
-                        className="w-full pl-10 pr-4 py-3 border border-stone-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
-                        required
-                      />
-                    </div>
-                    <p className="text-[10px] text-stone-400">
-                      Must be a registered Safaricom number capable of receiving push prompts.
-                    </p>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-stone-700 uppercase tracking-wider block">
+                    Sender Phone Number (Optional)
+                  </label>
+                  <div className="relative">
+                    <Phone className="absolute left-3.5 top-3.5 h-4.5 w-4.5 text-stone-400" />
+                    <input
+                      type="tel"
+                      value={mpesaPhone}
+                      onChange={(e) => setMpesaPhone(e.target.value)}
+                      placeholder="e.g. 0715185037"
+                      className="w-full pl-10 pr-4 py-3 border border-stone-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
+                    />
                   </div>
-
-                  <button
-                    type="submit"
-                    disabled={paying}
-                    className="w-full flex items-center justify-center space-x-2 py-3.5 px-4 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow-lg shadow-emerald-600/10 transition disabled:opacity-50"
-                  >
-                    {paying ? (
-                      <Loader2 className="h-5 w-5 animate-spin" />
-                    ) : (
-                      <>
-                        <CreditCard className="h-5 w-5" />
-                        <span>Send Safaricom Push Request</span>
-                      </>
-                    )}
-                  </button>
-
-                  <p className="text-center text-[10px] text-stone-400 max-w-sm mx-auto leading-relaxed">
-                    By confirming, you authorize a secure transaction of KSh {getListingFee(selectedType)} via Safaricom Daraja API. Active for 30 days.
+                  <p className="text-[10px] text-stone-400">
+                    The Safaricom number that initiated the Paybill payment to help verify.
                   </p>
-                </form>
-              )}
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={paying || !mpesaCode}
+                  className="w-full flex items-center justify-center space-x-2 py-3.5 px-4 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow-lg shadow-emerald-600/10 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {paying ? (
+                    <Loader2 className="h-5 w-5 animate-spin" />
+                  ) : (
+                    <>
+                      <Check className="h-5 w-5" />
+                      <span>Submit Payment Confirmation Code</span>
+                    </>
+                  )}
+                </button>
+
+                <p className="text-center text-[10px] text-stone-400 max-w-sm mx-auto leading-relaxed">
+                  By submitting, you represent that you have completed this transaction. Intentionally submitting false codes may lead to account ban.
+                </p>
+              </form>
             </div>
           )}
 

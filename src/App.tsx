@@ -1,7 +1,7 @@
 import React from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "./context/AuthContext";
-import { ProtectedRoute } from "./components/ProtectedRoute";
+import { ProtectedRoute, PublicRoute } from "./components/ProtectedRoute";
 import { Header } from "./components/Header";
 
 // Pages
@@ -27,11 +27,41 @@ export default function App() {
           {/* Page Routing Views */}
           <main className="flex-grow">
             <Routes>
-              {/* Public Access Hubs */}
-              <Route path="/" element={<Browse />} />
-              <Route path="/property/:id" element={<PropertyDetail />} />
-              <Route path="/login" element={<Login />} />
-              <Route path="/signup" element={<Signup />} />
+              {/* Protected Access Hubs */}
+              <Route
+                path="/"
+                element={
+                  <ProtectedRoute>
+                    <Browse />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/property/:id"
+                element={
+                  <ProtectedRoute>
+                    <PropertyDetail />
+                  </ProtectedRoute>
+                }
+              />
+
+              {/* Public Guest Only Pages (Redirects authenticated users to homepage) */}
+              <Route
+                path="/login"
+                element={
+                  <PublicRoute>
+                    <Login />
+                  </PublicRoute>
+                }
+              />
+              <Route
+                path="/signup"
+                element={
+                  <PublicRoute>
+                    <Signup />
+                  </PublicRoute>
+                }
+              />
 
               {/* Onboarding View (requires session but handles profile completions) */}
               <Route
@@ -83,7 +113,7 @@ export default function App() {
               <Route
                 path="/admin"
                 element={
-                  <ProtectedRoute>
+                  <ProtectedRoute allowedRoles={["admin"]}>
                     <Admin />
                   </ProtectedRoute>
                 }

@@ -15,11 +15,22 @@ const getStoredConfig = () => {
 
 const storedConfig = getStoredConfig();
 
-const supabaseUrl = storedConfig.url || (import.meta as any).env?.VITE_SUPABASE_URL || "";
-const supabaseAnonKey = storedConfig.key || (import.meta as any).env?.VITE_SUPABASE_ANON_KEY || "";
+const supabaseUrl = (storedConfig.url || (import.meta as any).env?.VITE_SUPABASE_URL || "").trim();
+const supabaseAnonKey = (storedConfig.key || (import.meta as any).env?.VITE_SUPABASE_ANON_KEY || "").trim();
 
 const isPlaceholder = (val: string) => {
-  return !val || val.includes("MY_SUPABASE") || val.includes("placeholder") || val.includes("YOUR_") || val === "";
+  if (!val) return true;
+  const clean = val.trim().toLowerCase();
+  return (
+    clean === "" ||
+    clean === "null" ||
+    clean === "undefined" ||
+    clean.includes("my_supabase") ||
+    clean.includes("placeholder") ||
+    clean.includes("your-") ||
+    clean.includes("your_") ||
+    clean.includes("example.com")
+  );
 };
 
 const useRealSupabase = !isPlaceholder(supabaseUrl) && !isPlaceholder(supabaseAnonKey);
@@ -168,7 +179,14 @@ class SupabaseSimulator {
 
   private initializeLocalStorage() {
     if (!localStorage.getItem(this.STORAGE_KEYS.PROPERTIES)) {
-      localStorage.setItem(this.STORAGE_KEYS.PROPERTIES, JSON.stringify(INITIAL_PROPERTIES));
+      const propertiesWithVerified = INITIAL_PROPERTIES.map(p => ({
+        ...p,
+        payment_status: "verified",
+        mpesa_code: "MOCKINITCODE",
+        amount_paid: 200,
+        submitted_at: new Date().toISOString()
+      }));
+      localStorage.setItem(this.STORAGE_KEYS.PROPERTIES, JSON.stringify(propertiesWithVerified));
     }
     if (!localStorage.getItem(this.STORAGE_KEYS.PROFILES)) {
       const mockProfiles = [
@@ -176,9 +194,82 @@ class SupabaseSimulator {
         { id: "landlord-2", full_name: "Grace Mutua", phone: "0722987654", role: "landlord", avatar_url: "" },
         { id: "landlord-3", full_name: "Ahmed Omar", phone: "0733111222", role: "landlord", avatar_url: "" },
         { id: "landlord-4", full_name: "Sarah Wanjiku", phone: "0755444333", role: "landlord", avatar_url: "" },
-        { id: "tenant-1", full_name: "Brian Otieno", phone: "0799888777", role: "tenant", avatar_url: "" }
+        { id: "tenant-1", full_name: "Brian Otieno", phone: "0799888777", role: "tenant", avatar_url: "" },
+        { id: "admin-1", full_name: "System Admin", phone: "0700123456", role: "admin", avatar_url: "" },
+        { id: "42eca9a0-c070-4898-b830-46c3247ea71d", full_name: "Developer Admin", phone: "0722000000", role: "admin", avatar_url: "" }
       ];
       localStorage.setItem(this.STORAGE_KEYS.PROFILES, JSON.stringify(mockProfiles));
+    } else {
+      // Dynamic migration to guarantee admin-1 and the user's custom ID have role 'admin'
+      try {
+        const currentProfiles = JSON.parse(localStorage.getItem(this.STORAGE_KEYS.PROFILES) || "[]");
+        
+        // Ensure admin-1
+        const adminProfileIdx = currentProfiles.findIndex((p: any) => p.id === "admin-1" || p.full_name === "System Admin");
+        if (adminProfileIdx !== -1) {
+          if (currentProfiles[adminProfileIdx].role !== "admin") {
+            currentProfiles[adminProfileIdx].role = "admin";
+          }
+        } else {
+          currentProfiles.push({ id: "admin-1", full_name: "System Admin", phone: "0700123456", role: "admin", avatar_url: "" });
+        }
+
+        // Ensure user ID 42eca9a0-c070-4898-b830-46c3247ea71d
+        const customAdminIdx = currentProfiles.findIndex((p: any) => p.id === "42eca9a0-c070-4898-b830-46c3247ea71d");
+        if (customAdminIdx !== -1) {
+          currentProfiles[customAdminIdx].role = "admin";
+        } else {
+          currentProfiles.push({
+            id: "42eca9a0-c070-4898-b830-46c3247ea71d",
+            full_name: "Developer Admin",
+            phone: "0722000000",
+            role: "admin",
+            avatar_url: ""
+          });
+        }
+
+        localStorage.setItem(this.STORAGE_KEYS.PROFILES, JSON.stringify(currentProfiles));
+      } catch (err) {
+        console.error("Failed to migrate mock profiles", err);
+      }
+    }
+
+    // Also migrate and ensure mock users exist and have correct admin roles
+    try {
+      let currentUsers = JSON.parse(localStorage.getItem("nestlist_mock_users") || "[]");
+      if (currentUsers.length === 0) {
+        currentUsers = [
+          { id: "landlord-1", email: "landlord1@nestlist.co.ke", password: "password", role: "landlord" },
+          { id: "landlord-2", email: "landlord2@nestlist.co.ke", password: "password", role: "landlord" },
+          { id: "tenant-1", email: "tenant1@nestlist.co.ke", password: "password", role: "tenant" },
+          { id: "42eca9a0-c070-4898-b830-46c3247ea71d", email: "thesilentwhisper.ke@gmail.com", password: "password", role: "admin" }
+        ];
+      }
+
+      // Sync thesilentwhisper.ke@gmail.com user
+      const customUserIdx = currentUsers.findIndex((u: any) => u.id === "42eca9a0-c070-4898-b830-46c3247ea71d" || u.email === "thesilentwhisper.ke@gmail.com");
+      if (customUserIdx !== -1) {
+        currentUsers[customUserIdx].role = "admin";
+        currentUsers[customUserIdx].id = "42eca9a0-c070-4898-b830-46c3247ea71d"; // lock the admin ID
+        currentUsers[customUserIdx].email = "thesilentwhisper.ke@gmail.com";
+      } else {
+        currentUsers.push({
+          id: "42eca9a0-c070-4898-b830-46c3247ea71d",
+          email: "thesilentwhisper.ke@gmail.com",
+          password: "password",
+          role: "admin"
+        });
+      }
+
+      // Sync other mock admin identities if needed
+      const oldAdminIdx = currentUsers.findIndex((u: any) => u.id === "admin-1");
+      if (oldAdminIdx !== -1) {
+        currentUsers[oldAdminIdx].role = "admin";
+      }
+
+      localStorage.setItem("nestlist_mock_users", JSON.stringify(currentUsers));
+    } catch (err) {
+      console.error("Failed to migrate mock users", err);
     }
     if (!localStorage.getItem(this.STORAGE_KEYS.PAYMENTS)) {
       localStorage.setItem(this.STORAGE_KEYS.PAYMENTS, JSON.stringify([]));
@@ -272,19 +363,25 @@ class SupabaseSimulator {
     },
 
     signInWithPassword: async ({ email, password }: { email: string; password: string }) => {
-      const users = JSON.parse(localStorage.getItem("nestlist_mock_users") || "[]");
+      let users = JSON.parse(localStorage.getItem("nestlist_mock_users") || "[]");
       // Add default seeds if not existing
       if (users.length === 0) {
         users.push(
           { id: "landlord-1", email: "landlord1@nestlist.co.ke", password: "password", role: "landlord" },
           { id: "landlord-2", email: "landlord2@nestlist.co.ke", password: "password", role: "landlord" },
           { id: "tenant-1", email: "tenant1@nestlist.co.ke", password: "password", role: "tenant" },
-          { id: "admin-1", email: "thesilentwhisper.ke@gmail.com", password: "password", role: "landlord" } // Admin check
+          { id: "42eca9a0-c070-4898-b830-46c3247ea71d", email: "thesilentwhisper.ke@gmail.com", password: "password", role: "admin" }
         );
         localStorage.setItem("nestlist_mock_users", JSON.stringify(users));
       }
 
-      const user = users.find((u: any) => u.email === email && u.password === password);
+      // Fallback fallback: dynamically inject the developer admin if somehow missing at runtime
+      if (email === "thesilentwhisper.ke@gmail.com" && !users.some((u: any) => u.email === email)) {
+        users.push({ id: "42eca9a0-c070-4898-b830-46c3247ea71d", email, password, role: "admin" });
+        localStorage.setItem("nestlist_mock_users", JSON.stringify(users));
+      }
+
+      const user = users.find((u: any) => u.email?.toLowerCase() === email?.toLowerCase() && u.password === password);
       if (!user) {
         return { data: { user: null, session: null }, error: new Error("Invalid login credentials") };
       }
@@ -298,10 +395,11 @@ class SupabaseSimulator {
 
     signInWithOAuth: async ({ provider, options }: { provider: string; options?: any }) => {
       // Simulate Google OAuth
+      // For development ease, we automatically sign in as the actual active user: thesilentwhisper.ke@gmail.com with admin role
       const mockOAuthUser = {
-        id: `google-user-${Date.now()}`,
-        email: "googleuser@gmail.com",
-        role: "tenant" // Will redirect to onboarding
+        id: "42eca9a0-c070-4898-b830-46c3247ea71d",
+        email: "thesilentwhisper.ke@gmail.com",
+        role: "admin"
       };
       
       const session = { access_token: "google-token", user: mockOAuthUser };
