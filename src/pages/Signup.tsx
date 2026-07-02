@@ -494,11 +494,11 @@ export const Signup: React.FC = () => {
               © 2026 Nestlist Rental Platforms Limited
             </p>
             <div className="flex justify-center space-x-3 text-xs text-stone-400 font-medium">
-              <a href="#" className="hover:text-stone-600 transition">Terms</a>
+              <span className="text-stone-400">Terms</span>
               <span>·</span>
-              <a href="#" className="hover:text-stone-600 transition">Privacy</a>
+              <Link to="/privacy" className="hover:text-stone-600 transition">Privacy</Link>
               <span>·</span>
-              <a href="#" className="hover:text-stone-600 transition">Support</a>
+              <span className="text-stone-400">Support</span>
             </div>
           </div>
 

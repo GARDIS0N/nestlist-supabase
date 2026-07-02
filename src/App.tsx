@@ -1,5 +1,5 @@
 import React from "react";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, Link } from "react-router-dom";
 import { AuthProvider } from "./context/AuthContext";
 import { ProtectedRoute, PublicRoute } from "./components/ProtectedRoute";
 import { Header } from "./components/Header";
@@ -15,6 +15,7 @@ import { SearchAlerts } from "./pages/SearchAlerts";
 import { LandlordDashboard } from "./pages/LandlordDashboard";
 import { ListProperty } from "./pages/ListProperty";
 import { Admin } from "./pages/Admin";
+import { Privacy } from "./pages/Privacy";
 
 export default function App() {
   return (
@@ -119,6 +120,14 @@ export default function App() {
                 }
               />
 
+              {/* Publicly Accessible Privacy Policy */}
+              <Route
+                path="/privacy"
+                element={
+                  <Privacy />
+                }
+              />
+
               {/* Wildcard Fallback */}
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
@@ -131,7 +140,12 @@ export default function App() {
               <p className="text-stone-500">
                 Connecting Landlords and Tenants across Nairobi, Kiambu, Nakuru, Kisumu, and Mombasa.
               </p>
-              <p className="text-[10px] text-stone-600">
+              <div className="flex justify-center space-x-4 text-stone-500 text-[11px] font-medium pt-1">
+                <Link to="/privacy" className="hover:text-amber-500 hover:underline transition">Privacy Policy</Link>
+                <span>•</span>
+                <span className="text-stone-600">Terms of Service</span>
+              </div>
+              <p className="text-[10px] text-stone-600 pt-1">
                 All Rights Reserved © 2026. Powered by Safaricom Daraja & Africa's Talking API integrations.
               </p>
             </div>
