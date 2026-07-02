@@ -47,6 +47,7 @@ const isPlaceholder = (val: string) => {
 };
 
 const useRealSupabase = !isPlaceholder(supabaseUrl) && !isPlaceholder(supabaseAnonKey);
+export const isSupabaseConfigured = useRealSupabase;
 
 // =====================================================================
 // DUMMY PROPERTIES SEED DATA (REPRESENTING KENYA LOCATIONS)
@@ -814,10 +815,144 @@ class SupabaseSimulator {
 
 // Export either standard Supabase client or high-fidelity simulator
 export const supabase = useRealSupabase
-  ? createClient(supabaseUrl, supabaseAnonKey)
+  ? createClient(supabaseUrl, supabaseAnonKey, {
+      auth: {
+        autoRefreshToken: true,
+        persistSession: true,
+        detectSessionInUrl: true,
+      },
+      realtime: {
+        params: {
+          eventsPerSecond: 10,
+        },
+      },
+    })
   : (new SupabaseSimulator() as unknown as ReturnType<typeof createClient>);
 
 export const IS_MOCK_SUPABASE = !useRealSupabase;
+
+// Helper to check connection
+export async function checkSupabaseConnection(): Promise<{
+  connected: boolean;
+  error?: string;
+}> {
+  if (!isSupabaseConfigured) {
+    return { connected: false, error: 'No credentials configured' };
+  }
+  try {
+    const { error } = await supabase
+      .from('profiles')
+      .select('id')
+      .limit(1);
+    if (error) throw error;
+    return { connected: true };
+  } catch (err: any) {
+    return { connected: false, error: err.message };
+  }
+}
+
+export type Database = {
+  public: {
+    Tables: {
+      profiles: {
+        Row: {
+          id: string;
+          full_name: string | null;
+          phone: string | null;
+          email: string | null;
+          role: 'landlord' | 'caretaker' | 'agent' |
+                'tenant' | 'admin' | 'superadmin';
+          avatar_url: string | null;
+          is_active: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: Omit<Database['public']['Tables']['profiles']['Row'],
+          'created_at' | 'updated_at'>;
+        Update: Partial<Database['public']['Tables']['profiles']['Insert']>;
+      };
+      properties: {
+        Row: {
+          id: string;
+          landlord_id: string;
+          title: string;
+          description: string | null;
+          location: string | null;
+          county: string | null;
+          type: string | null;
+          price: number | null;
+          amenities: string[];
+          images: string[];
+          is_active: boolean;
+          is_featured: boolean;
+          expires_at: string | null;
+          view_count: number;
+          inquiry_count: number;
+          payment_status: 'unpaid' | 'pending_verification' |
+                          'verified' | 'rejected';
+          rejection_reason: string | null;
+          expiry_sms_sent: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: Omit<Database['public']['Tables']['properties']['Row'],
+          'id' | 'created_at' | 'updated_at' |
+          'view_count' | 'inquiry_count'>;
+        Update: Partial<Database['public']['Tables']['properties']['Insert']>;
+      };
+      listing_payments: {
+        Row: {
+          id: string;
+          property_id: string | null;
+          landlord_id: string | null;
+          amount: number;
+          amount_paid: number | null;
+          property_type: string | null;
+          mpesa_code: string | null;
+          payer_phone: string | null;
+          status: 'pending' | 'confirmed' | 'failed' | 'cancelled';
+          rejection_reason: string | null;
+          verified_at: string | null;
+          verified_by: string | null;
+          created_at: string;
+        };
+        Insert: Omit<Database['public']['Tables']['listing_payments']['Row'],
+          'id' | 'created_at'>;
+        Update: Partial<Database['public']['Tables']['listing_payments']['Insert']>;
+      };
+      inquiries: {
+        Row: {
+          id: string;
+          property_id: string | null;
+          tenant_id: string | null;
+          landlord_id: string | null;
+          message: string;
+          tenant_name: string | null;
+          tenant_phone: string | null;
+          tenant_email: string | null;
+          status: 'pending' | 'responded' | 'closed';
+          reply: string | null;
+          replied_at: string | null;
+          created_at: string;
+        };
+        Insert: Omit<Database['public']['Tables']['inquiries']['Row'],
+          'id' | 'created_at'>;
+        Update: Partial<Database['public']['Tables']['inquiries']['Insert']>;
+      };
+      saved_properties: {
+        Row: {
+          id: string;
+          tenant_id: string;
+          property_id: string;
+          created_at: string;
+        };
+        Insert: Omit<Database['public']['Tables']['saved_properties']['Row'],
+          'id' | 'created_at'>;
+        Update: never;
+      };
+    };
+  };
+};
 
 export const getSupabaseConfig = () => {
   return {

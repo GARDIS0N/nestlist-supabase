@@ -16,6 +16,8 @@ import { LandlordDashboard } from "./pages/LandlordDashboard";
 import { ListProperty } from "./pages/ListProperty";
 import { Admin } from "./pages/Admin";
 import { Privacy } from "./pages/Privacy";
+import AuthCallback from "./pages/AuthCallback";
+import { DevConnectionBanner } from "./components/DevConnectionBanner";
 
 export default function App() {
   return (
@@ -73,6 +75,9 @@ export default function App() {
                   </ProtectedRoute>
                 }
               />
+
+              {/* OAuth Callback Redirect handling */}
+              <Route path="/auth/callback" element={<AuthCallback />} />
 
               {/* Tenant Reserved Pages */}
               <Route
@@ -150,6 +155,7 @@ export default function App() {
               </p>
             </div>
           </footer>
+          <DevConnectionBanner />
         </div>
       </BrowserRouter>
     </AuthProvider>

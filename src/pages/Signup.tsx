@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import { UserPlus, KeyRound, Mail, Phone, User, AlertCircle, Settings, X, Eye, EyeOff, ShieldCheck, ArrowLeft, Check } from "lucide-react";
+import { AlertCircle, Settings, X, Eye, EyeOff, ArrowLeft } from "lucide-react";
 import { SupabaseConfigPanel } from "../components/SupabaseConfigPanel";
 import { supabase, getSupabaseConfig } from "../lib/supabase";
 
@@ -135,14 +135,44 @@ export const Signup: React.FC = () => {
 
   const ROLES = [
     { id: "landlord", icon: "🏠", title: "Landlord", desc: "I own property to rent" },
-    { id: "caretaker", icon: "🔑", title: "Caretaker", desc: "I manage on behalf of owner" },
+    { id: "caretaker", icon: "🔑", title: "Caretaker", desc: "I manage property for owner" },
     { id: "agent", icon: "👔", title: "Agent", desc: "Licensed property agent" },
-    { id: "tenant", icon: "🔍", title: "Tenant", desc: "Looking for a rental" },
+    { id: "tenant", icon: "🔍", title: "Tenant", desc: "Looking to rent" },
   ] as const;
 
   return (
     <div className="min-h-screen flex bg-white font-sans relative" id="signup-root">
-      
+      <style>{`
+        @keyframes floatLogo {
+          0%, 100% { transform: translateY(0px); }
+          50% { transform: translateY(-6px); }
+        }
+        @keyframes cardEntrance {
+          from { opacity: 0; transform: translateY(16px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        .animate-float-logo {
+          animation: floatLogo 4s ease-in-out infinite;
+        }
+        .animate-card-entrance {
+          animation: cardEntrance 0.4s ease-out forwards;
+        }
+        .input-transition {
+          transition: border-color 0.15s ease, box-shadow 0.15s ease;
+        }
+        .input-transition:focus {
+          border-color: #1E6B4A !important;
+          box-shadow: 0 0 0 3px rgba(30,107,74,0.1) !important;
+        }
+        .btn-transition {
+          transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+        .btn-transition:hover {
+          transform: translateY(-1px);
+          box-shadow: 0 6px 20px rgba(30,107,74,0.45) !important;
+        }
+      `}</style>
+
       {/* Dev Only Gear Icon in Top Right */}
       {!!(import.meta as any).env?.DEV && (
         <button
@@ -173,8 +203,12 @@ export const Signup: React.FC = () => {
         </div>
       )}
 
-      {/* LEFT PANEL — DESKTOP ONLY */}
-      <div className="hidden md:flex md:w-[45%] flex-col justify-between p-12 text-white relative overflow-hidden" 
+      {/* Background decorations for mobile only */}
+      <div className="md:hidden fixed top-0 right-0 w-[200px] h-[200px] rounded-full bg-[#1E6B4A]/[0.08] blur-[60px] pointer-events-none z-0" />
+      <div className="md:hidden fixed bottom-0 left-0 w-[160px] h-[160px] rounded-full bg-[#34D399]/[0.06] blur-[60px] pointer-events-none z-0" />
+
+      {/* LEFT PANEL — DESKTOP ONLY (40% width) */}
+      <div className="hidden md:flex md:w-[40%] flex-col justify-between p-12 text-white relative overflow-hidden" 
            style={{ background: "linear-gradient(135deg, #0A4D2E, #1E6B4A)" }}
            id="desktop-left-panel">
         
@@ -182,72 +216,64 @@ export const Signup: React.FC = () => {
         <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.05)_1.5px,transparent_1.5px),linear-gradient(90deg,rgba(255,255,255,0.05)_1.5px,transparent_1.5px)] bg-[size:24px_24px] opacity-30 pointer-events-none"></div>
 
         {/* Brand Header Group */}
-        <div className="space-y-6 relative z-10">
-          <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-white text-[#1E6B4A] shadow-xl animate-float">
-            <span className="font-serif text-4xl font-black">N</span>
+        <div className="space-y-6 relative z-10 my-auto">
+          <div className="flex h-[72px] w-[72px] items-center justify-center rounded-2xl bg-white text-[#1E6B4A] shadow-[0_0_20px_rgba(255,255,255,0.3)] animate-float-logo mx-auto md:mx-0">
+            <span className="font-serif text-4xl font-bold">N</span>
           </div>
           <div>
-            <h1 className="text-4xl lg:text-5xl font-serif font-bold tracking-tight text-white leading-tight">
+            <h1 className="text-4xl font-serif font-bold tracking-tight text-white text-center md:text-left">
               NestList
             </h1>
-            <p className="mt-2.5 text-lg text-white/70 font-normal">
+            <p className="mt-2 text-[15px] text-white/70 font-normal text-center md:text-left">
               Kenya's Premium Rental Platform
             </p>
           </div>
-        </div>
 
-        {/* Divider and Trust Points */}
-        <div className="space-y-8 relative z-10 py-8 border-t border-white/20">
-          <div className="space-y-5">
-            <div className="flex items-center space-x-4">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-white/10 text-white border border-white/10 text-lg">
-                🏠
-              </div>
-              <span className="text-base font-semibold text-white/90">1,200+ verified listings</span>
+          {/* Horizontal divider */}
+          <div className="w-full border-t border-white/15 my-4"></div>
+
+          {/* Trust Points */}
+          <div className="space-y-4">
+            <div className="flex items-center space-x-3 text-[14px]">
+              <span className="text-lg">🏠</span>
+              <span className="font-medium text-white/90">1,200+ verified listings</span>
             </div>
-            <div className="flex items-center space-x-4">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-white/10 text-white border border-white/10 text-lg">
-                ✅
-              </div>
-              <span className="text-base font-semibold text-white/90">Trusted by landlords across Kenya</span>
+            <div className="flex items-center space-x-3 text-[14px]">
+              <span className="text-lg">✅</span>
+              <span className="font-medium text-white/90">Trusted landlords across Kenya</span>
             </div>
-            <div className="flex items-center space-x-4">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-white/10 text-white border border-white/10 text-lg">
-                🔒
-              </div>
-              <span className="text-base font-semibold text-white/90">Secure M-Pesa payments</span>
+            <div className="flex items-center space-x-3 text-[14px]">
+              <span className="text-lg">🇰🇪</span>
+              <span className="font-medium text-white/90">Serving Nairobi, Mombasa & beyond</span>
             </div>
           </div>
         </div>
 
         {/* Footer info */}
-        <div className="relative z-10 text-xs text-white/60">
+        <div className="relative z-10 text-[11px] text-white/40">
           © 2026 Nestlist Rental Platforms Limited
         </div>
       </div>
 
-      {/* RIGHT PANEL — SIGNUP FORM PANEL */}
-      <div className="w-full md:w-[55%] flex flex-col justify-center items-center px-6 py-12 md:px-16" id="signup-form-panel">
+      {/* RIGHT PANEL — SIGNUP FORM PANEL (60% width) */}
+      <div className="w-full md:w-[60%] flex flex-col justify-center items-center px-6 py-12 md:px-16 z-10" id="signup-form-panel">
         
-        <div className="w-full max-w-[400px] space-y-8 animate-fade-in">
+        <div className="w-full max-w-[400px] space-y-6 animate-card-entrance">
           
           {/* Logo on mobile view only */}
           <div className="flex md:hidden flex-col items-center justify-center text-center space-y-4">
-            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-[#1E6B4A] to-[#34D399] text-white shadow-lg shadow-emerald-950/10">
-              <span className="font-serif text-3xl font-black">N</span>
+            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-[#1E6B4A] to-[#34D399] text-white shadow-[0_8px_24px_rgba(30,107,74,0.4)] animate-float-logo">
+              <span className="font-serif text-3xl font-bold">N</span>
             </div>
-            <h2 className="text-3xl font-serif font-bold text-stone-900 tracking-tight">
-              NestList
-            </h2>
           </div>
 
           {/* Form Header Title */}
           <div className="text-center md:text-left flex items-center justify-between">
             <div>
-              <h3 className="text-2xl sm:text-3xl font-serif font-bold text-stone-900 tracking-tight">
+              <h3 className="text-[26px] font-serif font-bold text-[#111827] tracking-tight">
                 {step === 1 ? "Create account" : "Select your role"}
               </h3>
-              <p className="mt-2 text-sm text-stone-500 font-medium">
+              <p className="mt-1 text-[14px] text-[#6B7280]">
                 {step === 1 ? "Join Kenya's rental community" : "Tell us how you'll use NestList"}
               </p>
             </div>
@@ -255,7 +281,7 @@ export const Signup: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setStep(1)}
-                className="flex items-center space-x-1.5 text-xs font-bold text-[#1E6B4A] hover:underline"
+                className="flex items-center space-x-1 text-xs font-bold text-[#1E6B4A] hover:underline"
               >
                 <ArrowLeft className="h-4 w-4" />
                 <span>Back</span>
@@ -265,23 +291,26 @@ export const Signup: React.FC = () => {
 
           {/* ERROR DISPLAY BANNER */}
           {error && (
-            <div className="rounded-xl bg-[#FEF2F2] p-4 border border-[#FECACA] text-[#DC2626] text-sm font-medium leading-relaxed flex items-start space-x-3 shadow-xs">
-              <AlertCircle className="h-5 w-5 text-[#DC2626] shrink-0 mt-0.5" />
+            <div className="rounded-[10px] bg-[#FEF2F2] p-[11px] px-[14px] border border-[#FECACA] text-[#DC2626] text-[13px] font-medium leading-relaxed flex items-start space-x-2 shadow-xs">
+              <AlertCircle className="h-4 w-4 text-[#DC2626] shrink-0 mt-0.5" />
               <span>{error}</span>
             </div>
           )}
 
           {/* STEP 1: ACCOUNT DETAILS */}
           {step === 1 ? (
-            <form onSubmit={handleContinueToRole} className="space-y-5">
+            <form onSubmit={handleContinueToRole} className="space-y-4">
               
               {/* Full Name */}
               <div className="space-y-1.5">
-                <label className="text-[11px] font-bold text-stone-500 uppercase tracking-wider block">
-                  Full Name
+                <label className="text-[10px] font-bold text-[#9CA3AF] uppercase tracking-wider block">
+                  FULL NAME
                 </label>
                 <div className="relative">
-                  <User className="absolute left-3.5 top-3.5 h-5 w-5 text-stone-400 pointer-events-none" />
+                  <svg className="absolute left-3.5 top-3.5 h-[18px] w-[18px] text-[#9CA3AF] pointer-events-none" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" />
+                    <circle cx="12" cy="7" r="4" />
+                  </svg>
                   <input
                     type="text"
                     value={fullName}
@@ -290,7 +319,7 @@ export const Signup: React.FC = () => {
                       if (error) setError(null);
                     }}
                     placeholder="e.g. Peter Kamau"
-                    className="w-full pl-11 pr-4 py-3.5 rounded-xl border border-stone-200 bg-white transition duration-150 focus:outline-none focus:border-[#1E6B4A] focus:ring-4 focus:ring-[#1E6B4A]/10 text-base"
+                    className="w-full pl-11 pr-4 py-3.5 rounded-xl border-[1.5px] border-[#E5E7EB] bg-white text-base input-transition"
                     style={{ minHeight: "48px" }}
                     required
                   />
@@ -299,17 +328,17 @@ export const Signup: React.FC = () => {
 
               {/* Phone Number with Kenyan Formatting */}
               <div className="space-y-1.5">
-                <label className="text-[11px] font-bold text-stone-500 uppercase tracking-wider block">
-                  Phone Number
+                <label className="text-[10px] font-bold text-[#9CA3AF] uppercase tracking-wider block">
+                  PHONE NUMBER
                 </label>
-                <div className="relative">
-                  <Phone className="absolute left-3.5 top-3.5 h-5 w-5 text-stone-400 pointer-events-none" />
+                <div className="relative flex items-center">
+                  <span className="absolute left-3.5 text-stone-500 text-base select-none pointer-events-none">🇰🇪</span>
                   <input
                     type="tel"
                     value={phone}
                     onChange={handlePhoneChange}
-                    placeholder="e.g. 0712345678"
-                    className="w-full pl-11 pr-4 py-3.5 rounded-xl border border-stone-200 bg-white transition duration-150 focus:outline-none focus:border-[#1E6B4A] focus:ring-4 focus:ring-[#1E6B4A]/10 text-base"
+                    placeholder="+254 712 345 678"
+                    className="w-full pl-11 pr-4 py-3.5 rounded-xl border-[1.5px] border-[#E5E7EB] bg-white text-base input-transition"
                     style={{ minHeight: "48px" }}
                     required
                   />
@@ -318,11 +347,14 @@ export const Signup: React.FC = () => {
 
               {/* Email Address */}
               <div className="space-y-1.5">
-                <label className="text-[11px] font-bold text-stone-500 uppercase tracking-wider block">
-                  Email Address
+                <label className="text-[10px] font-bold text-[#9CA3AF] uppercase tracking-wider block">
+                  EMAIL ADDRESS
                 </label>
                 <div className="relative">
-                  <Mail className="absolute left-3.5 top-3.5 h-5 w-5 text-stone-400 pointer-events-none" />
+                  <svg className="absolute left-3.5 top-3.5 h-[18px] w-[18px] text-[#9CA3AF] pointer-events-none" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <rect width="20" height="16" x="2" y="4" rx="2" />
+                    <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
+                  </svg>
                   <input
                     type="email"
                     value={email}
@@ -331,7 +363,7 @@ export const Signup: React.FC = () => {
                       if (error) setError(null);
                     }}
                     placeholder="you@example.com"
-                    className="w-full pl-11 pr-4 py-3.5 rounded-xl border border-stone-200 bg-white transition duration-150 focus:outline-none focus:border-[#1E6B4A] focus:ring-4 focus:ring-[#1E6B4A]/10 text-base"
+                    className="w-full pl-11 pr-4 py-3.5 rounded-xl border-[1.5px] border-[#E5E7EB] bg-white text-base input-transition"
                     style={{ minHeight: "48px" }}
                     required
                   />
@@ -340,11 +372,14 @@ export const Signup: React.FC = () => {
 
               {/* Create Password */}
               <div className="space-y-1.5">
-                <label className="text-[11px] font-bold text-stone-500 uppercase tracking-wider block">
-                  Create Password
+                <label className="text-[10px] font-bold text-[#9CA3AF] uppercase tracking-wider block">
+                  CREATE PASSWORD
                 </label>
                 <div className="relative">
-                  <KeyRound className="absolute left-3.5 top-3.5 h-5 w-5 text-stone-400 pointer-events-none" />
+                  <svg className="absolute left-3.5 top-3.5 h-[18px] w-[18px] text-[#9CA3AF] pointer-events-none" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <rect width="18" height="11" x="3" y="11" rx="2" ry="2" />
+                    <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                  </svg>
                   <input
                     type={showPassword ? "text" : "password"}
                     value={password}
@@ -353,7 +388,7 @@ export const Signup: React.FC = () => {
                       if (error) setError(null);
                     }}
                     placeholder="Minimum 6 characters"
-                    className="w-full pl-11 pr-12 py-3.5 rounded-xl border border-stone-200 bg-white transition duration-150 focus:outline-none focus:border-[#1E6B4A] focus:ring-4 focus:ring-[#1E6B4A]/10 text-base"
+                    className="w-full pl-11 pr-12 py-3.5 rounded-xl border-[1.5px] border-[#E5E7EB] bg-white text-base input-transition"
                     style={{ minHeight: "48px" }}
                     required
                   />
@@ -370,8 +405,8 @@ export const Signup: React.FC = () => {
                 {password && (
                   <div className="space-y-1.5 pt-1" id="password-strength-container">
                     <div className="flex justify-between items-center text-xs">
-                      <span className="text-stone-500 font-medium">Password Strength:</span>
-                      <span className={`font-bold ${passwordStrength.labelColor}`}>
+                      <span className="text-[#9CA3AF] font-bold text-[10px] uppercase">PASSWORD STRENGTH</span>
+                      <span className={`font-bold text-xs ${passwordStrength.labelColor}`}>
                         {passwordStrength.label}
                       </span>
                     </div>
@@ -388,17 +423,26 @@ export const Signup: React.FC = () => {
               {/* Continue button */}
               <button
                 type="submit"
-                className="w-full flex items-center justify-center py-3.5 px-5 text-[15px] font-bold text-white rounded-xl shadow-lg shadow-emerald-950/5 hover:-translate-y-0.5 hover:shadow-xl hover:shadow-emerald-950/10 active:translate-y-0 transition-all duration-200"
+                className="w-full flex items-center justify-center py-3.5 px-5 text-[15px] font-bold text-white rounded-xl shadow-[0_4px_16px_rgba(30,107,74,0.3)] btn-transition active:translate-y-0 transition-all duration-200"
                 style={{
                   background: "linear-gradient(135deg, #1E6B4A, #34D399)",
-                  minHeight: "48px"
+                  minHeight: "48px",
+                  borderRadius: "12px"
                 }}
               >
                 Continue →
               </button>
 
+              {/* KENYAN CONTEXT INFO BOX */}
+              <div className="bg-[#F0FDF4] border border-[#A7F3D0] rounded-[10px] p-[10px] px-[14px] flex items-start space-x-2.5 shadow-2xs" id="kenyan-context-box">
+                <span className="text-base shrink-0">🇰🇪</span>
+                <p className="text-[12px] text-[#065F46] font-medium leading-relaxed">
+                  M-Pesa accepted · Listings from KES 100 · Nairobi, Mombasa, Nakuru & more
+                </p>
+              </div>
+
               {/* Login Redirect */}
-              <p className="text-center text-sm text-stone-600 font-medium">
+              <p className="text-center text-sm text-stone-600 font-medium pt-2">
                 Already have an account?{" "}
                 <Link to="/login" className="font-bold text-[#1E6B4A] hover:underline">
                   Sign In here
@@ -408,7 +452,7 @@ export const Signup: React.FC = () => {
             </form>
           ) : (
             /* STEP 2: ROLE SELECTION */
-            <form onSubmit={handleSignUp} className="space-y-6">
+            <form onSubmit={handleSignUp} className="space-y-6 animate-fade-in">
               
               {/* 2x2 Grid of Roles */}
               <div className="grid grid-cols-2 gap-4" id="role-selection-grid">
@@ -419,7 +463,7 @@ export const Signup: React.FC = () => {
                       key={r.id}
                       type="button"
                       onClick={() => setRole(r.id)}
-                      className={`relative p-5 rounded-2xl border-2 text-left transition-all duration-200 flex flex-col justify-between space-y-4 hover:border-[#1E6B4A]/60 ${
+                      className={`relative p-5 rounded-2xl border-2 text-left flex flex-col justify-between space-y-4 hover:border-[#1E6B4A]/60 transition-all duration-200 ${
                         isSelected
                           ? "border-[#1E6B4A] bg-[#F0FDF4] shadow-md shadow-emerald-900/5"
                           : "border-stone-100 bg-white"
@@ -454,10 +498,11 @@ export const Signup: React.FC = () => {
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full flex items-center justify-center py-3.5 px-5 text-[15px] font-bold text-white rounded-xl shadow-lg shadow-emerald-950/5 hover:-translate-y-0.5 hover:shadow-xl hover:shadow-emerald-950/10 active:translate-y-0 transition-all duration-200 disabled:opacity-50"
+                className="w-full flex items-center justify-center py-3.5 px-5 text-[15px] font-bold text-white rounded-xl shadow-[0_4px_16px_rgba(30,107,74,0.3)] btn-transition active:translate-y-0 transition-all duration-200 disabled:opacity-50"
                 style={{
                   background: "linear-gradient(135deg, #1E6B4A, #34D399)",
-                  minHeight: "48px"
+                  minHeight: "48px",
+                  borderRadius: "12px"
                 }}
               >
                 {loading ? (
@@ -480,25 +525,17 @@ export const Signup: React.FC = () => {
             </form>
           )}
 
-          {/* KENYAN CONTEXT INFO BOX */}
-          <div className="bg-[#F0FDF4] border border-[#A7F3D0] rounded-xl p-3.5 flex items-start space-x-2.5 shadow-2xs" id="kenyan-context-box">
-            <span className="text-base shrink-0">🇰🇪</span>
-            <p className="text-[13px] text-[#065F46] font-medium leading-relaxed">
-              M-Pesa payments accepted · Listings from KES 100 · Active across Nairobi, Mombasa & beyond
-            </p>
-          </div>
-
           {/* Styled Footer */}
-          <div className="pt-6 border-t border-stone-100 text-center space-y-2" id="signup-footer">
-            <p className="text-xs text-stone-400 font-medium">
+          <div className="pt-4 border-t border-[#F3F4F6] text-center space-y-2 mt-8 w-full" id="signup-footer">
+            <p className="text-[12px] text-[#9CA3AF]">
               © 2026 Nestlist Rental Platforms Limited
             </p>
-            <div className="flex justify-center space-x-3 text-xs text-stone-400 font-medium">
-              <span className="text-stone-400">Terms</span>
+            <div className="flex justify-center space-x-3 text-[12px] text-[#9CA3AF]">
+              <Link to="/terms" className="text-[#1E6B4A] hover:underline">Terms</Link>
               <span>·</span>
-              <Link to="/privacy" className="hover:text-stone-600 transition">Privacy</Link>
+              <Link to="/privacy" className="text-[#1E6B4A] hover:underline">Privacy</Link>
               <span>·</span>
-              <span className="text-stone-400">Support</span>
+              <Link to="/support" className="text-[#1E6B4A] hover:underline">Support</Link>
             </div>
           </div>
 
