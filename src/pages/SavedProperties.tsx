@@ -121,6 +121,9 @@ export const SavedProperties: React.FC = () => {
                   alt={property.title}
                   className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                   referrerPolicy="no-referrer"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).src = "https://images.unsplash.com/photo-1522771739844-6a9f6d5f14af?auto=format&fit=crop&w=600&q=80";
+                  }}
                 />
 
                 <span className="absolute top-3 left-3 bg-stone-900/80 backdrop-blur-sm text-amber-400 text-[10px] font-bold uppercase px-2 py-1 rounded-full border border-stone-700">

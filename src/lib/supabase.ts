@@ -15,7 +15,20 @@ const getStoredConfig = () => {
 
 const storedConfig = getStoredConfig();
 
-const supabaseUrl = (storedConfig.url || (import.meta as any).env?.VITE_SUPABASE_URL || "").trim();
+const sanitizeUrl = (url: string): string => {
+  let clean = (url || "").trim();
+  if (clean.endsWith("/rest/v1/")) {
+    clean = clean.slice(0, -9);
+  } else if (clean.endsWith("/rest/v1")) {
+    clean = clean.slice(0, -8);
+  }
+  if (clean.endsWith("/")) {
+    clean = clean.slice(0, -1);
+  }
+  return clean;
+};
+
+const supabaseUrl = sanitizeUrl(storedConfig.url || (import.meta as any).env?.VITE_SUPABASE_URL || "");
 const supabaseAnonKey = (storedConfig.key || (import.meta as any).env?.VITE_SUPABASE_ANON_KEY || "").trim();
 
 const isPlaceholder = (val: string) => {

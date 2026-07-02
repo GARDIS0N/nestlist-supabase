@@ -53,7 +53,20 @@ app.use(cors({
 // =====================================================================
 // SUPABASE REAL DATABASE SETUP
 // =====================================================================
-const supabaseUrl = (process.env.VITE_SUPABASE_URL || "").trim();
+const sanitizeUrl = (url: string): string => {
+  let clean = (url || "").trim();
+  if (clean.endsWith("/rest/v1/")) {
+    clean = clean.slice(0, -9);
+  } else if (clean.endsWith("/rest/v1")) {
+    clean = clean.slice(0, -8);
+  }
+  if (clean.endsWith("/")) {
+    clean = clean.slice(0, -1);
+  }
+  return clean;
+};
+
+const supabaseUrl = sanitizeUrl(process.env.VITE_SUPABASE_URL || "");
 const supabaseAnonKey = (process.env.VITE_SUPABASE_ANON_KEY || "").trim();
 const supabaseServiceKey = (process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_SERVICE_ROLE_KEY || supabaseAnonKey).trim();
 

@@ -509,6 +509,9 @@ export const Browse: React.FC = () => {
                       alt={property.title}
                       className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                       referrerPolicy="no-referrer"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).src = "https://images.unsplash.com/photo-1522771739844-6a9f6d5f14af?auto=format&fit=crop&w=600&q=80";
+                      }}
                     />
 
                     {/* Badge: Rent Type */}

@@ -1,25 +1,24 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { supabase } from "../lib/supabase";
-
-interface Profile {
-  id: string;
-  full_name: string;
-  phone: string;
-  role: "landlord" | "tenant" | "user" | "admin";
-  avatar_url: string | null;
-  created_at: string;
-}
+import { Profile, ProfileRole } from "../types/database";
 
 interface AuthContextType {
   session: any;
   profile: Profile | null;
   loading: boolean;
-  signUp: (email: string, password: string, fullName: string, phone: string, role: "landlord" | "tenant" | "user" | "admin") => Promise<any>;
-  signIn: (email: string, password: string) => Promise<any>;
-  signInWithGoogle: () => Promise<any>;
-  signOut: () => Promise<any>;
-  resetPassword: (email: string) => Promise<any>;
+  signUp: (
+    email: string,
+    password: string,
+    fullName: string,
+    phone: string,
+    role: ProfileRole
+  ) => Promise<{ data: any; error: any }>;
+  signIn: (email: string, password: string) => Promise<{ data: any; error: any }>;
+  signInWithGoogle: () => Promise<{ data: any; error: any }>;
+  signOut: () => Promise<{ error: any }>;
+  resetPassword: (email: string) => Promise<{ data: any; error: any }>;
   refreshProfile: () => Promise<void>;
+  updateProfile: (data: Partial<Profile>) => Promise<{ data: any; error: any }>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -40,28 +39,44 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       if (error) {
         console.error("Error loading user profile:", error);
-        setProfile(null);
-      } else if (data) {
-        setProfile(data as Profile);
-      } else {
-        setProfile(null);
+        return null;
       }
+      return data as Profile | null;
     } catch (err) {
       console.error("Exception loading profile:", err);
-      setProfile(null);
+      return null;
     }
   };
 
   const refreshProfile = async () => {
     if (session?.user?.id) {
-      await loadProfile(session.user.id);
+      const p = await loadProfile(session.user.id);
+      setProfile(p);
+    }
+  };
+
+  const updateProfile = async (data: Partial<Profile>) => {
+    if (!session?.user?.id) return { data: null, error: new Error("No user session found") };
+    try {
+      const { data: updated, error } = await supabase
+        .from("profiles")
+        .update(data)
+        .eq("id", session.user.id)
+        .select()
+        .single();
+
+      if (error) throw error;
+      setProfile(updated as Profile);
+      return { data: updated, error: null };
+    } catch (err: any) {
+      console.error("Update profile failed:", err);
+      return { data: null, error: err };
     }
   };
 
   useEffect(() => {
     let active = true;
 
-    // 1. Get initial session and load matching profiles row first
     const checkSession = async () => {
       setLoading(true);
       try {
@@ -69,21 +84,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (active) {
           setSession(initialSession);
           if (initialSession?.user?.id) {
-            // Load profile synchronously inside the initial setup phase
-            const { data, error } = await supabase
-              .from("profiles")
-              .select("*")
-              .eq("id", initialSession.user.id)
-              .maybeSingle();
-            
-            if (active) {
-              if (error) {
-                console.error("Error loading user profile on init:", error);
-                setProfile(null);
-              } else {
-                setProfile(data as Profile || null);
-              }
-            }
+            const p = await loadProfile(initialSession.user.id);
+            if (active) setProfile(p);
           } else {
             if (active) setProfile(null);
           }
@@ -99,7 +101,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     checkSession();
 
-    // 2. Setup auth listener to keep session and profile in sync
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, newSession) => {
       if (!active) return;
 
@@ -107,28 +108,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setSession(null);
         setProfile(null);
         setLoading(false);
-      } else if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED" || event === "USER_UPDATED") {
+      } else if (
+        event === "SIGNED_IN" ||
+        event === "TOKEN_REFRESHED" ||
+        event === "USER_UPDATED"
+      ) {
         setLoading(true);
         setSession(newSession);
         if (newSession?.user?.id) {
-          const { data, error } = await supabase
-            .from("profiles")
-            .select("*")
-            .eq("id", newSession.user.id)
-            .maybeSingle();
-          
+          const p = await loadProfile(newSession.user.id);
           if (active) {
-            if (error) {
-              console.error("Error loading profile on auth state change:", error);
-              setProfile(null);
-            } else {
-              setProfile(data as Profile || null);
-            }
+            setProfile(p);
+            setLoading(false);
           }
         } else {
-          if (active) setProfile(null);
+          if (active) {
+            setProfile(null);
+            setLoading(false);
+          }
         }
-        if (active) setLoading(false);
       } else {
         setSession(newSession);
       }
@@ -146,7 +144,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     password: string,
     fullName: string,
     phone: string,
-    role: "landlord" | "tenant" | "user" | "admin"
+    role: ProfileRole
   ) => {
     setLoading(true);
     try {
@@ -154,31 +152,37 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         email,
         password,
         options: {
+          emailRedirectTo: `${window.location.origin}/onboarding`,
           data: {
             full_name: fullName,
             phone: phone,
             role: role,
+            email_confirm: false,
           },
         },
       });
 
       if (error) throw error;
 
-      // Ensure profiles insert succeeds (handled automatically inside mock, but explicit for real Supabase)
       if (data?.user) {
+        // Use upsert to handle database triggers that might auto-create the row
         const { error: profileError } = await supabase
           .from("profiles")
-          .insert({
+          .upsert({
             id: data.user.id,
             full_name: fullName,
             phone: phone,
             role: role,
+            email: email,
+            avatar_url: null,
           });
-        
-        if (profileError && profileError.message && !profileError.message.includes("already exists")) {
-          console.error("Error inserting profile row:", profileError);
+
+        if (profileError) {
+          console.error("Profile upsert failed during registration:", profileError);
         }
-        await loadProfile(data.user.id);
+        
+        const p = await loadProfile(data.user.id);
+        setProfile(p);
       }
 
       return { data, error: null };
@@ -202,7 +206,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (error) throw error;
 
       if (data?.user) {
-        await loadProfile(data.user.id);
+        const p = await loadProfile(data.user.id);
+        setProfile(p);
       }
 
       return { data, error: null };
@@ -221,7 +226,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
-          redirectTo: window.location.origin,
+          redirectTo: `${window.location.origin}/onboarding`,
         },
       });
 
@@ -237,25 +242,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // SIGN OUT
   const signOut = async () => {
-    setLoading(true);
+    setSession(null);
+    setProfile(null);
     try {
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
-      setProfile(null);
-      setSession(null);
       return { error: null };
     } catch (error: any) {
       console.error("Logout failed:", error);
       return { error };
-    } finally {
-      setLoading(false);
     }
   };
 
   // RESET PASSWORD
   const resetPassword = async (email: string) => {
     try {
-      const { data, error } = await supabase.auth.resetPasswordForEmail(email);
+      const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/login`,
+      });
       if (error) throw error;
       return { data, error: null };
     } catch (error: any) {
@@ -275,7 +279,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         signInWithGoogle,
         signOut,
         resetPassword,
-        refreshProfile
+        refreshProfile,
+        updateProfile,
       }}
     >
       {children}

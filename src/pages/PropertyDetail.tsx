@@ -6,7 +6,7 @@ import { MapPin, Phone, MessageSquare, ChevronLeft, ChevronRight, Check, Heart, 
 
 export const PropertyDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
-  const { profile } = useAuth();
+  const { profile, updateProfile } = useAuth();
   const navigate = useNavigate();
 
   const [property, setProperty] = useState<any | null>(null);
@@ -22,6 +22,13 @@ export const PropertyDetail: React.FC = () => {
   const [inquiryMessage, setInquiryMessage] = useState("");
   const [sendingInquiry, setSendingInquiry] = useState(false);
   const [inquirySuccess, setInquirySuccess] = useState(false);
+  const [tenantPhone, setTenantPhone] = useState("");
+
+  useEffect(() => {
+    if (profile?.phone) {
+      setTenantPhone(profile.phone);
+    }
+  }, [profile]);
 
   useEffect(() => {
     const fetchPropertyDetails = async () => {
@@ -113,10 +120,30 @@ export const PropertyDetail: React.FC = () => {
     }
     if (!inquiryMessage.trim()) return;
 
+    const activePhone = profile.phone || tenantPhone;
+    if (!activePhone) {
+      alert("Please provide a valid phone number before submitting.");
+      return;
+    }
+
     setSendingInquiry(true);
 
     try {
-      // Insert new inquiry row. This triggers SMS send automatically via SQL trigger or mock simulator
+      // 1. If tenant has no phone stored in profile, save it now
+      if (!profile.phone) {
+        const { error: updateError } = await supabase
+          .from("profiles")
+          .update({ phone: activePhone })
+          .eq("id", profile.id);
+
+        if (updateError) throw updateError;
+        
+        if (typeof updateProfile === "function") {
+          await updateProfile({ phone: activePhone });
+        }
+      }
+
+      // 2. Insert new inquiry row
       const { error } = await supabase
         .from("inquiries")
         .insert({
@@ -128,6 +155,24 @@ export const PropertyDetail: React.FC = () => {
         });
 
       if (error) throw error;
+
+      // 3. Notify landlord via SMS
+      try {
+        await supabase.functions.invoke("send-sms", {
+          body: {
+            type: "inquiry_sent",
+            phone: landlord?.phone,
+            data: {
+              tenant_name: profile.full_name || "A tenant",
+              property_title: property.title,
+              tenant_phone: activePhone,
+              message: inquiryMessage.substring(0, 80),
+            }
+          }
+        });
+      } catch (smsErr) {
+        console.warn("SMS notification failed (non-blocking):", smsErr);
+      }
 
       setInquirySuccess(true);
       setInquiryMessage("");
@@ -227,6 +272,9 @@ export const PropertyDetail: React.FC = () => {
               alt={`${property.title} - view ${activeImageIndex + 1}`}
               className="w-full h-full object-cover"
               referrerPolicy="no-referrer"
+              onError={(e) => {
+                (e.target as HTMLImageElement).src = "https://images.unsplash.com/photo-1522771739844-6a9f6d5f14af?auto=format&fit=crop&w=800&q=80";
+              }}
             />
 
             {/* Navigation buttons */}
@@ -445,9 +493,28 @@ export const PropertyDetail: React.FC = () => {
                       className="w-full border border-stone-300 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
                       required
                     ></textarea>
-                    <p className="text-[10px] text-stone-400 leading-normal">
-                      Note: Your phone number ({profile?.phone || "N/A"}) will be included in the SMS body so the landlord can call or WhatsApp you directly.
-                    </p>
+                    {!profile?.phone ? (
+                      <div className="space-y-1.5 mt-3">
+                        <label className="text-xs font-bold text-stone-700 uppercase tracking-wider block">
+                          Your Phone Number *
+                        </label>
+                        <input
+                          type="tel"
+                          required
+                          placeholder="e.g. +254700123456"
+                          value={tenantPhone}
+                          onChange={(e) => setTenantPhone(e.target.value)}
+                          className="w-full border border-stone-300 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
+                        />
+                        <p className="text-[10px] text-stone-400">
+                          Enter your phone number so the landlord can contact you directly. This will be saved to your profile.
+                        </p>
+                      </div>
+                    ) : (
+                      <p className="text-[10px] text-stone-400 leading-normal">
+                        Note: Your phone number ({profile?.phone}) will be included in the SMS body so the landlord can call or WhatsApp you directly.
+                      </p>
+                    )}
                   </div>
 
                   <div className="flex items-center justify-end space-x-3 pt-3 border-t border-stone-100">

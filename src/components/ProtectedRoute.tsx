@@ -1,10 +1,11 @@
 import React from "react";
 import { Navigate, useLocation, Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { ProfileRole } from "../types/database";
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
-  allowedRoles?: Array<"landlord" | "tenant" | "user" | "admin">;
+  allowedRoles?: ProfileRole[];
 }
 
 /**

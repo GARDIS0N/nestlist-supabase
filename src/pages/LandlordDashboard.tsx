@@ -89,9 +89,34 @@ export const LandlordDashboard: React.FC = () => {
   };
 
   useEffect(() => {
-    if (selectedInquiryId) {
-      fetchChatMessages(selectedInquiryId);
-    }
+    if (!selectedInquiryId) return;
+
+    fetchChatMessages(selectedInquiryId);
+
+    // Setup realtime subscription for this inquiry's messages
+    const channel = supabase
+      .channel(`inquiry-messages-${selectedInquiryId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "messages",
+          filter: `inquiry_id=eq.${selectedInquiryId}`,
+        },
+        (payload) => {
+          const newMessage = payload.new;
+          setChatMessages((prev) => {
+            if (prev.some((msg) => msg.id === newMessage.id)) return prev;
+            return [...prev, newMessage];
+          });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [selectedInquiryId]);
 
   const handleUpdateInquiryStatus = async (inquiryId: string, nextStatus: "responded" | "closed") => {
@@ -302,6 +327,9 @@ export const LandlordDashboard: React.FC = () => {
                       alt={property.title}
                       className="w-full h-full object-cover"
                       referrerPolicy="no-referrer"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).src = "https://images.unsplash.com/photo-1522771739844-6a9f6d5f14af?auto=format&fit=crop&w=600&q=80";
+                      }}
                     />
 
                     {/* Active Status Badge */}

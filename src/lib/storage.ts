@@ -1,6 +1,6 @@
 import { supabase } from './supabase';
 
-const BUCKET = 'nestlist-images';
+const BUCKET = 'property-images';
 
 // Compress image before upload
 async function compressImage(file: File): Promise<Blob> {
@@ -44,9 +44,12 @@ export async function uploadListingPhoto(
   const compressed = await compressImage(file);
   if (onProgress) onProgress(30);
 
-  // Generate unique filename
-  const ext = 'jpg';
-  const filename = `listings/${propertyId}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+  // Get active session for landlord_id
+  const { data: { session } } = await supabase.auth.getSession();
+  const landlordId = session?.user?.id || 'unknown';
+  const timestamp = Date.now();
+  const cleanFileName = file.name.replace(/[^a-zA-Z0-9.-]/g, "_");
+  const filename = `${landlordId}/${propertyId}/${timestamp}-${cleanFileName}`;
 
   // Upload to Supabase Storage
   const { data, error } = await supabase.storage
@@ -104,13 +107,14 @@ export async function uploadAvatar(
 export async function deleteListingPhoto(
   photoUrl: string
 ): Promise<void> {
-  // Extract path from URL
-  const urlParts = photoUrl.split('/nestlist-images/');
+  // Extract path from URL - handle both potential bucket names
+  const bucketName = photoUrl.includes('/property-images/') ? 'property-images' : 'nestlist-images';
+  const urlParts = photoUrl.split(`/${bucketName}/`);
   if (urlParts.length < 2) return;
   const path = urlParts[1];
 
   const { error } = await supabase.storage
-    .from(BUCKET)
+    .from(bucketName)
     .remove([path]);
 
   if (error) {
@@ -122,14 +126,15 @@ export async function deleteListingPhoto(
 export async function deleteAllListingPhotos(
   propertyId: string
 ): Promise<void> {
+  // Attempt on primary bucket
   const { data, error } = await supabase.storage
     .from(BUCKET)
     .list(`listings/${propertyId}`);
 
-  if (error || !data?.length) return;
-
-  const paths = data.map(f => `listings/${propertyId}/${f.name}`);
-  await supabase.storage.from(BUCKET).remove(paths);
+  if (!error && data?.length) {
+    const paths = data.map(f => `listings/${propertyId}/${f.name}`);
+    await supabase.storage.from(BUCKET).remove(paths);
+  }
 }
 
 // Get public URL for a stored path
