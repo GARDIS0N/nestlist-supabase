@@ -4,6 +4,7 @@ import { useAuth } from "../context/AuthContext";
 import { AlertCircle, Settings, X, Eye, EyeOff, ArrowLeft } from "lucide-react";
 import { SupabaseConfigPanel } from "../components/SupabaseConfigPanel";
 import { supabase, getSupabaseConfig } from "../lib/supabase";
+import { useClearErrorOnTyping } from "../hooks/useClearErrorOnTyping";
 
 export const Signup: React.FC = () => {
   const { signUp } = useAuth();
@@ -21,6 +22,11 @@ export const Signup: React.FC = () => {
 
   // Dev configuration panel state
   const [showConfig, setShowConfig] = useState(false);
+
+  // Automatically clear error when any input or state changes
+  useClearErrorOnTyping([email, password, fullName, phone, role], () => {
+    if (error) setError(null);
+  });
 
   // Check for mock mode on load and log developer notice to console only
   useEffect(() => {

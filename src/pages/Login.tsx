@@ -4,6 +4,7 @@ import { useAuth } from "../context/AuthContext";
 import { AlertCircle, Settings, X, Eye, EyeOff } from "lucide-react";
 import { SupabaseConfigPanel } from "../components/SupabaseConfigPanel";
 import { supabase, getSupabaseConfig } from "../lib/supabase";
+import { useClearErrorOnTyping } from "../hooks/useClearErrorOnTyping";
 
 export const Login: React.FC = () => {
   const { signIn, signInWithGoogle, resetPassword } = useAuth();
@@ -28,6 +29,11 @@ export const Login: React.FC = () => {
 
   // Dev configuration panel state
   const [showConfig, setShowConfig] = useState(false);
+
+  // Automatically clear error when any input changes
+  useClearErrorOnTyping([email, password, resetEmail], () => {
+    if (error) setError(null);
+  });
 
   const redirectPath = location.state?.from?.pathname || "/";
 
