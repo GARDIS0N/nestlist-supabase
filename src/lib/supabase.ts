@@ -1,44 +1,46 @@
-import { createClient } from '@supabase/supabase-js'
+import { createClient } from '@supabase/supabase-js';
 
-// Get stored config if available in browser environment
-const getStoredConfig = () => {
-  if (typeof window !== "undefined") {
-    const storedUrl = localStorage.getItem("NESTLIST_SUPABASE_URL");
-    const storedKey = localStorage.getItem("NESTLIST_SUPABASE_ANON_KEY");
-    if (storedUrl && storedKey) {
-      return { url: storedUrl.trim(), key: storedKey.trim(), isUsingStored: true };
-    }
+export function sanitizeUrl(url: string): string {
+  if (!url) return '';
+  // Remove trailing slashes
+  url = url.trim().replace(/\/+$/, '');
+  // Remove /rest/v1 or any path
+  url = url.replace(/\/rest\/v1.*$/, '');
+  url = url.replace(/\/auth\/v1.*$/, '');
+  // Ensure https://
+  if (!url.startsWith('https://')) {
+    url = 'https://' + url.replace(/^http:\/\//, '');
   }
-  return {
-    url: ((import.meta.env.VITE_SUPABASE_URL || "https://wkbkcjbtvzfbjkbovpac.supabase.co") as string).trim(),
-    key: ((import.meta.env.VITE_SUPABASE_ANON_KEY || "") as string).trim(),
-    isUsingStored: false
-  };
-};
-
-const activeConfig = getStoredConfig();
-
-// Sanitize URL by removing trailing slash if present
-let rawUrl = activeConfig.url;
-if (rawUrl && rawUrl.endsWith('/')) {
-  rawUrl = rawUrl.slice(0, -1);
+  return url;
 }
 
-const supabaseUrl = rawUrl;
-const supabaseAnonKey = activeConfig.key;
+const SUPABASE_URL = sanitizeUrl(
+  import.meta.env.VITE_SUPABASE_URL
+  || 'https://wkbkcjbtvzfbjkbovpac.supabase.co'
+);
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey)
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY
+  || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndrYmtjamJ0dnpmYmprYm92cGFjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI3NzIyMjQsImV4cCI6MjA5ODM0ODIyNH0.pxuck5s1lLwy0lVWpBOKZGvWGbFHtDZ1SUs96WuZWt0';
 
-// Keep helper exports to prevent compile errors in existing files
-export const isSupabaseConfigured = !!supabaseUrl && !!supabaseAnonKey;
+export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+  auth: {
+    autoRefreshToken: true,
+    persistSession: true,
+    detectSessionInUrl: true,
+    storageKey: 'nestlist-auth',
+  },
+});
+
+export const isSupabaseConfigured = true;
 export const IS_MOCK_SUPABASE = false;
+export const SUPABASE_PROJECT_URL = SUPABASE_URL;
 
 export const getSupabaseConfig = () => {
   return {
-    url: supabaseUrl,
-    anonKey: supabaseAnonKey,
+    url: SUPABASE_URL,
+    anonKey: SUPABASE_ANON_KEY,
     isMock: false,
-    isUsingStored: activeConfig.isUsingStored
+    isUsingStored: false,
   };
 };
 
@@ -49,10 +51,18 @@ export const setSupabaseConfig = (url: string, key: string) => {
   }
 };
 
-export async function checkSupabaseConnection() {
+export async function checkSupabaseConnection(): Promise<{
+  connected: boolean;
+  error?: string;
+}> {
   try {
-    const { error } = await supabase.from('profiles').select('id').limit(1);
-    if (error) throw error;
+    const { error } = await supabase
+      .from('profiles')
+      .select('id')
+      .limit(1);
+    if (error && error.code !== 'PGRST116') {
+      return { connected: false, error: error.message };
+    }
     return { connected: true };
   } catch (err: any) {
     return { connected: false, error: err.message };
@@ -174,3 +184,5 @@ export const INITIAL_PROPERTIES = [
     created_at: new Date(Date.now() - 12 * 24 * 60 * 60 * 1000).toISOString()
   }
 ];
+
+export default supabase;

@@ -1,10 +1,10 @@
 import React, { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { supabase } from "../lib/supabase";
 import { Eye, EyeOff } from "lucide-react";
 
 export const Signup: React.FC = () => {
-  const { signUp } = useAuth();
   const navigate = useNavigate();
 
   const [role, setRole] = useState<"tenant" | "landlord">("tenant");
@@ -50,13 +50,38 @@ export const Signup: React.FC = () => {
     setLoading(true);
     setError(null);
 
-    const { error: err } = await signUp(email, password, fullName, phone, role);
-    setLoading(false);
+    try {
+      const { data, error } = await supabase.auth.signUp({
+        email: email.trim().toLowerCase(),
+        password: password,
+        options: {
+          data: {
+            full_name: fullName,
+            phone: phone,
+            role: role,
+          }
+        }
+      });
 
-    if (err) {
-      setError(err);
-    } else {
-      setIsSuccess(true);
+      if (error) throw error;
+
+      if (data.user) {
+        await supabase.from('profiles').upsert({
+          id: data.user.id,
+          full_name: fullName,
+          phone: phone,
+          email: email.trim().toLowerCase(),
+          role: role || 'tenant',
+          is_active: true,
+        });
+        navigate('/onboarding');
+      } else {
+        setIsSuccess(true);
+      }
+    } catch (err: any) {
+      setError(err.message || "Sign up failed. Please try again.");
+    } finally {
+      setLoading(false);
     }
   };
 

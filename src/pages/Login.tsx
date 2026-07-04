@@ -1,10 +1,10 @@
 import React, { useState } from "react";
 import { useNavigate, useLocation, Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { supabase } from "../lib/supabase";
 import { Eye, EyeOff } from "lucide-react";
 
 export const Login: React.FC = () => {
-  const { signIn } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -24,14 +24,41 @@ export const Login: React.FC = () => {
     setLoading(true);
     setError(null);
 
-    const { error: err } = await signIn(email, password);
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: email.trim().toLowerCase(),
+      password: password,
+    });
+
+    if (error) {
+      setLoading(false);
+      if (error.message.includes('Invalid login credentials')) {
+        setError('Incorrect email or password. Please try again.');
+      } else if (error.message.includes('Email not confirmed')) {
+        setError('Please check your email inbox to confirm your account first.');
+      } else if (error.message.includes('Invalid path')) {
+        setError('Connection error. Please try again.');
+      } else {
+        setError(error.message);
+      }
+      return;
+    }
+
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', data.user.id)
+      .single();
+
     setLoading(false);
 
-    if (err) {
-      setError(err);
+    if (profile?.role === 'admin' || 
+        profile?.role === 'superadmin') {
+      navigate('/admin');
+    } else if (['landlord','caretaker','agent']
+        .includes(profile?.role || '')) {
+      navigate('/dashboard');
     } else {
-      const destination = location.state?.from?.pathname || "/";
-      navigate(destination, { replace: true });
+      navigate('/');
     }
   };
 

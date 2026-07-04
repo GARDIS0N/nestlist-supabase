@@ -1,10 +1,11 @@
 import React from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { supabase } from "../lib/supabase";
 import { Home, Heart, Bell, LayoutDashboard, Shield, LogOut, User, Menu, X } from "lucide-react";
 
 export const Header: React.FC = () => {
-  const { profile, signOut } = useAuth();
+  const { profile } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false);
@@ -13,8 +14,8 @@ export const Header: React.FC = () => {
   const isAdmin = profile?.role === "admin" || profile?.id === "admin-1" || profile?.id === "42eca9a0-c070-4898-b830-46c3247ea71d";
 
   const handleSignOut = async () => {
-    await signOut();
-    navigate("/login");
+    const { error } = await supabase.auth.signOut();
+    if (!error) navigate('/login');
   };
 
   const isActive = (path: string) => {
