@@ -1,7 +1,7 @@
 import React from "react";
 import { BrowserRouter, Routes, Route, Navigate, Link } from "react-router-dom";
 import { AuthProvider } from "./context/AuthContext";
-import { ProtectedRoute, PublicRoute } from "./components/ProtectedRoute";
+import { ProtectedRoute, PublicOnlyRoute } from "./components/ProtectedRoute";
 import { Header } from "./components/Header";
 
 // Pages
@@ -30,6 +30,37 @@ export default function App() {
           {/* Page Routing Views */}
           <main className="flex-grow">
             <Routes>
+              {/* Public Guest Only Pages (Redirects authenticated users based on their role) */}
+              <Route
+                path="/login"
+                element={
+                  <PublicOnlyRoute>
+                    <Login />
+                  </PublicOnlyRoute>
+                }
+              />
+              <Route
+                path="/signup"
+                element={
+                  <PublicOnlyRoute>
+                    <Signup />
+                  </PublicOnlyRoute>
+                }
+              />
+
+              {/* Onboarding View (requires session, no role required yet) */}
+              <Route
+                path="/onboarding"
+                element={
+                  <ProtectedRoute>
+                    <Onboarding />
+                  </ProtectedRoute>
+                }
+              />
+
+              {/* OAuth Callback Redirect handling */}
+              <Route path="/auth/callback" element={<AuthCallback />} />
+
               {/* Protected Access Hubs */}
               <Route
                 path="/"
@@ -48,42 +79,11 @@ export default function App() {
                 }
               />
 
-              {/* Public Guest Only Pages (Redirects authenticated users to homepage) */}
-              <Route
-                path="/login"
-                element={
-                  <PublicRoute>
-                    <Login />
-                  </PublicRoute>
-                }
-              />
-              <Route
-                path="/signup"
-                element={
-                  <PublicRoute>
-                    <Signup />
-                  </PublicRoute>
-                }
-              />
-
-              {/* Onboarding View (requires session but handles profile completions) */}
-              <Route
-                path="/onboarding"
-                element={
-                  <ProtectedRoute>
-                    <Onboarding />
-                  </ProtectedRoute>
-                }
-              />
-
-              {/* OAuth Callback Redirect handling */}
-              <Route path="/auth/callback" element={<AuthCallback />} />
-
               {/* Tenant Reserved Pages */}
               <Route
                 path="/saved"
                 element={
-                  <ProtectedRoute allowedRoles={["tenant"]}>
+                  <ProtectedRoute role="tenant">
                     <SavedProperties />
                   </ProtectedRoute>
                 }
@@ -91,7 +91,7 @@ export default function App() {
               <Route
                 path="/alerts"
                 element={
-                  <ProtectedRoute allowedRoles={["tenant"]}>
+                  <ProtectedRoute role="tenant">
                     <SearchAlerts />
                   </ProtectedRoute>
                 }
@@ -101,7 +101,7 @@ export default function App() {
               <Route
                 path="/dashboard"
                 element={
-                  <ProtectedRoute allowedRoles={["landlord"]}>
+                  <ProtectedRoute role="landlord">
                     <LandlordDashboard />
                   </ProtectedRoute>
                 }
@@ -109,7 +109,7 @@ export default function App() {
               <Route
                 path="/list-property"
                 element={
-                  <ProtectedRoute allowedRoles={["landlord"]}>
+                  <ProtectedRoute role="landlord">
                     <ListProperty />
                   </ProtectedRoute>
                 }
@@ -119,7 +119,7 @@ export default function App() {
               <Route
                 path="/admin"
                 element={
-                  <ProtectedRoute allowedRoles={["admin"]}>
+                  <ProtectedRoute role="admin">
                     <Admin />
                   </ProtectedRoute>
                 }
@@ -133,8 +133,8 @@ export default function App() {
                 }
               />
 
-              {/* Wildcard Fallback */}
-              <Route path="*" element={<Navigate to="/" replace />} />
+              {/* Wildcard Fallback redirects unauthenticated/invalid routes to login */}
+              <Route path="*" element={<Navigate to="/login" replace />} />
             </Routes>
           </main>
 

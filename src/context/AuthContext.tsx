@@ -1,9 +1,20 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { supabase } from "../lib/supabase";
-import { Profile, ProfileRole } from "../types/database";
+import { Session, User } from "@supabase/supabase-js";
 
-interface AuthContextType {
-  session: any;
+export interface Profile {
+  id: string;
+  email: string | null;
+  full_name: string | null;
+  phone: string | null;
+  role: "landlord" | "tenant" | "admin" | null;
+  avatar_url: string | null;
+  created_at: string;
+}
+
+export interface AuthContextType {
+  session: Session | null;
+  user: User | null;
   profile: Profile | null;
   loading: boolean;
   signUp: (
@@ -11,30 +22,32 @@ interface AuthContextType {
     password: string,
     fullName: string,
     phone: string,
-    role: ProfileRole
-  ) => Promise<{ data: any; error: any }>;
-  signIn: (email: string, password: string) => Promise<{ data: any; error: any }>;
-  signInWithGoogle: () => Promise<{ data: any; error: any }>;
-  signOut: () => Promise<{ error: any }>;
-  resetPassword: (email: string) => Promise<{ data: any; error: any }>;
+    role: "landlord" | "tenant" | "admin"
+  ) => Promise<{ error: string | null }>;
+  signIn: (email: string, password: string) => Promise<{ error: string | null }>;
+  signInWithGoogle: () => Promise<{ error: string | null }>;
+  signOut: () => void;
+  updateProfile: (data: Partial<Profile>) => Promise<{ error: string | null }>;
   refreshProfile: () => Promise<void>;
-  updateProfile: (data: Partial<Profile>) => Promise<{ data: any; error: any }>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [session, setSession] = useState<any>(null);
+  const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState<boolean>(true);
 
-  // Load profile details based on uid
-  const loadProfile = async (uid: string) => {
+  // Derived user state
+  const user = session ? session.user : null;
+
+  // Fetch profile function
+  const fetchProfile = async (userId: string): Promise<Profile | null> => {
     try {
       const { data, error } = await supabase
         .from("profiles")
         .select("*")
-        .eq("id", uid)
+        .eq("id", userId)
         .maybeSingle();
 
       if (error) {
@@ -43,66 +56,45 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
       return data as Profile | null;
     } catch (err) {
-      console.error("Exception loading profile:", err);
+      console.error("Exception loading user profile:", err);
       return null;
     }
   };
 
-  const refreshProfile = async () => {
-    if (session?.user?.id) {
-      const p = await loadProfile(session.user.id);
-      setProfile(p);
-    }
-  };
-
-  const updateProfile = async (data: Partial<Profile>) => {
-    if (!session?.user?.id) return { data: null, error: new Error("No user session found") };
-    try {
-      const { data: updated, error } = await supabase
-        .from("profiles")
-        .update(data)
-        .eq("id", session.user.id)
-        .select()
-        .single();
-
-      if (error) throw error;
-      setProfile(updated as Profile);
-      return { data: updated, error: null };
-    } catch (err: any) {
-      console.error("Update profile failed:", err);
-      return { data: null, error: err };
-    }
-  };
-
+  // INITIALIZATION in useEffect
   useEffect(() => {
-    let active = true;
+    let isMounted = true;
 
-    const checkSession = async () => {
+    const initializeAuth = async () => {
       setLoading(true);
       try {
+        console.log("AuthContext: Initializing session check...");
         const { data: { session: initialSession } } = await supabase.auth.getSession();
-        if (active) {
+        
+        if (isMounted) {
           setSession(initialSession);
           if (initialSession?.user?.id) {
-            const p = await loadProfile(initialSession.user.id);
-            if (active) setProfile(p);
+            const prof = await fetchProfile(initialSession.user.id);
+            if (isMounted) setProfile(prof);
           } else {
-            if (active) setProfile(null);
+            if (isMounted) setProfile(null);
           }
         }
       } catch (err) {
         console.error("Error during initial session check:", err);
       } finally {
-        if (active) {
+        if (isMounted) {
           setLoading(false);
         }
       }
     };
 
-    checkSession();
+    initializeAuth();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, newSession) => {
-      if (!active) return;
+    // Subscribe to auth state change events explicitly
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, currentSession) => {
+      console.log(`[Auth Event Debug] AuthStateChange: ${event}`);
+      if (!isMounted) return;
 
       if (event === "SIGNED_OUT") {
         setSession(null);
@@ -113,27 +105,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         event === "TOKEN_REFRESHED" ||
         event === "USER_UPDATED"
       ) {
-        setLoading(true);
-        setSession(newSession);
-        if (newSession?.user?.id) {
-          const p = await loadProfile(newSession.user.id);
-          if (active) {
-            setProfile(p);
+        setSession(currentSession);
+        if (currentSession?.user?.id) {
+          const prof = await fetchProfile(currentSession.user.id);
+          if (isMounted) {
+            setProfile(prof);
             setLoading(false);
           }
         } else {
-          if (active) {
+          if (isMounted) {
             setProfile(null);
             setLoading(false);
           }
         }
       } else {
-        setSession(newSession);
+        setSession(currentSession);
       }
     });
 
     return () => {
-      active = false;
+      isMounted = false;
       subscription?.unsubscribe();
     };
   }, []);
@@ -144,127 +135,145 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     password: string,
     fullName: string,
     phone: string,
-    role: ProfileRole
-  ) => {
-    setLoading(true);
+    role: "landlord" | "tenant" | "admin"
+  ): Promise<{ error: string | null }> => {
     try {
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
-          emailRedirectTo: `${window.location.origin}/onboarding`,
+          emailRedirectTo: window.location.origin + "/",
           data: {
             full_name: fullName,
             phone: phone,
-            role: role,
-            email_confirm: false,
-          },
-        },
+            role: role
+          }
+        }
       });
 
       if (error) throw error;
 
       if (data?.user) {
-        // Use upsert to handle database triggers that might auto-create the row
         const { error: profileError } = await supabase
           .from("profiles")
           .upsert({
             id: data.user.id,
+            email: email,
             full_name: fullName,
             phone: phone,
             role: role,
-            email: email,
-            avatar_url: null,
-          });
+            created_at: new Date().toISOString()
+          }, { onConflict: 'id' });
 
         if (profileError) {
           console.error("Profile upsert failed during registration:", profileError);
+          return { error: profileError.message };
         }
-        
-        const p = await loadProfile(data.user.id);
-        setProfile(p);
+
+        const prof = await fetchProfile(data.user.id);
+        setProfile(prof);
       }
 
-      return { data, error: null };
+      return { error: null };
     } catch (error: any) {
-      console.error("Signup failed:", error);
-      return { data: null, error };
-    } finally {
-      setLoading(false);
+      console.error("Signup exception caught:", error);
+      return { error: error.message || "An error occurred during registration." };
     }
   };
 
   // SIGN IN
-  const signIn = async (email: string, password: string) => {
-    setLoading(true);
+  const signIn = async (email: string, password: string): Promise<{ error: string | null }> => {
     try {
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
 
-      if (error) throw error;
-
-      if (data?.user) {
-        const p = await loadProfile(data.user.id);
-        setProfile(p);
+      if (error) {
+        let userMsg = error.message;
+        const lowerMsg = userMsg.toLowerCase();
+        if (lowerMsg.includes("email not confirmed") || lowerMsg.includes("email_not_confirmed") || lowerMsg.includes("confirm your email")) {
+          userMsg = "Please check your inbox for a verification link";
+        } else if (
+          lowerMsg.includes("invalid grant") || 
+          lowerMsg.includes("invalid credentials") || 
+          lowerMsg.includes("incorrect password") || 
+          lowerMsg.includes("invalid login")
+        ) {
+          userMsg = "Incorrect email or password";
+        }
+        return { error: userMsg };
       }
 
-      return { data, error: null };
+      if (data?.user) {
+        const prof = await fetchProfile(data.user.id);
+        setProfile(prof);
+      }
+
+      return { error: null };
     } catch (error: any) {
-      console.error("Signin failed:", error);
-      return { data: null, error };
-    } finally {
-      setLoading(false);
+      console.error("Signin exception caught:", error);
+      return { error: error.message || "Login failed" };
     }
   };
 
-  // GOOGLE SIGN IN
-  const signInWithGoogle = async () => {
-    setLoading(true);
+  // SIGN IN WITH GOOGLE
+  const signInWithGoogle = async (): Promise<{ error: string | null }> => {
     try {
-      const { data, error } = await supabase.auth.signInWithOAuth({
+      const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
-          redirectTo: `${window.location.origin}/onboarding`,
+          redirectTo: window.location.origin + "/onboarding",
         },
       });
 
       if (error) throw error;
-      return { data, error: null };
+      return { error: null };
     } catch (error: any) {
-      console.error("Google login failed:", error);
-      return { data: null, error };
-    } finally {
-      setLoading(false);
+      console.error("Google login exception caught:", error);
+      return { error: error.message || "Google OAuth failed." };
     }
   };
 
   // SIGN OUT
-  const signOut = async () => {
+  const signOut = () => {
     setSession(null);
     setProfile(null);
     try {
-      const { error } = await supabase.auth.signOut();
-      if (error) throw error;
-      return { error: null };
-    } catch (error: any) {
-      console.error("Logout failed:", error);
-      return { error };
+      supabase.auth.signOut();
+    } catch (error) {
+      console.error("Signout exception caught:", error);
     }
   };
 
-  // RESET PASSWORD
-  const resetPassword = async (email: string) => {
+  // UPDATE PROFILE
+  const updateProfile = async (data: Partial<Profile>): Promise<{ error: string | null }> => {
+    const userId = session?.user?.id;
+    if (!userId) return { error: "No active user session found" };
     try {
-      const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/login`,
-      });
+      const { error } = await supabase
+        .from("profiles")
+        .update(data)
+        .eq("id", userId);
+
       if (error) throw error;
-      return { data, error: null };
+
+      const prof = await fetchProfile(userId);
+      setProfile(prof);
+
+      return { error: null };
     } catch (error: any) {
-      console.error("Reset password failed:", error);
-      return { data: null, error };
+      console.error("Update profile exception caught:", error);
+      return { error: error.message || "Failed to update profile." };
+    }
+  };
+
+  // REFRESH PROFILE
+  const refreshProfile = async (): Promise<void> => {
+    const userId = session?.user?.id;
+    if (userId) {
+      const prof = await fetchProfile(userId);
+      setProfile(prof);
     }
   };
 
@@ -272,15 +281,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     <AuthContext.Provider
       value={{
         session,
+        user,
         profile,
         loading,
         signUp,
         signIn,
         signInWithGoogle,
         signOut,
-        resetPassword,
-        refreshProfile,
         updateProfile,
+        refreshProfile,
       }}
     >
       {children}
