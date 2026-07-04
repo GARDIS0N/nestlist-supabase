@@ -138,112 +138,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     role: "landlord" | "tenant" | "admin"
   ): Promise<{ error: string | null }> => {
     try {
-      const getRedirectUrl = (): string | undefined => {
-        try {
-          const origin = window.location.origin;
-          // Only use redirect if it's a real URL not localhost, AI Studio, or Cloud Run (.run.app)
-          if (
-            origin.includes('aistudio') ||
-            origin.includes('localhost') ||
-            origin.includes('run.app') ||
-            origin.includes('127.0.0.1')
-          ) {
-            return undefined; // Let Supabase use the configured Site URL
-          }
-          return `${origin}/`;
-        } catch {
-          return undefined;
-        }
-      };
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: { full_name: fullName, phone, role },
+        },
+      });
 
-      const redirectUrl = getRedirectUrl();
-      const signUpOptions: any = {
-        data: { full_name: fullName, phone, role },
-      };
-
-      if (redirectUrl) {
-        signUpOptions.emailRedirectTo = redirectUrl;
-      }
-
-      let signUpResponse;
-      try {
-        signUpResponse = await supabase.auth.signUp({
-          email,
-          password,
-          options: signUpOptions,
-        });
-      } catch (err: any) {
-        console.warn("SignUp with options failed, retrying with minimal options:", err);
-        signUpResponse = await supabase.auth.signUp({
-          email,
-          password,
-          options: {
-            data: { full_name: fullName, phone, role },
-          },
-        });
-      }
-
-      let { data, error } = signUpResponse;
-
-      if (error) {
-        if (error.message.includes('Invalid path') || error.message.includes('URL')) {
-          try {
-            const retryRes = await supabase.auth.signUp({
-              email,
-              password,
-              options: {
-                data: { full_name: fullName, phone, role },
-              },
-            });
-            data = retryRes.data;
-            error = retryRes.error;
-          } catch (retryErr: any) {
-            return { error: retryErr.message || 'Sign up failed due to a configuration issue.' };
-          }
-        }
-      }
-
-      if (error) {
-        if (error.message.includes('Invalid path') || error.message.includes('URL')) {
-          return {
-            error: 'Sign up failed due to a configuration issue. Please try again.'
-          };
-        }
-        return { error: error.message };
-      }
-
-      if (data?.user) {
-        const { error: profileError } = await supabase
-          .from('profiles')
-          .upsert(
-            {
-              id: data.user.id,
-              email: email,
-              full_name: fullName,
-              phone: phone,
-              role: role,
-            },
-            { onConflict: 'id', ignoreDuplicates: false }
-          );
-
-        if (profileError) {
-          console.error("Profile upsert failed during registration:", profileError);
-          return { error: profileError.message };
-        }
-
-        const prof = await fetchProfile(data.user.id);
-        setProfile(prof);
-      }
+      if (error) return { error: error.message };
+      if (!data.user) return { error: "Sign up failed. Please try again." };
 
       return { error: null };
-    } catch (error: any) {
-      console.error("Signup exception caught:", error);
-      if (error.message && (error.message.includes('Invalid path') || error.message.includes('URL'))) {
-        return {
-          error: 'Sign up failed due to a configuration issue. Please try again.'
-        };
-      }
-      return { error: error.message || "An error occurred during registration." };
+    } catch (err: any) {
+      return { error: err.message || "Sign up failed. Please try again." };
     }
   };
 
