@@ -137,26 +137,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     phone: string,
     role: "landlord" | "tenant" | "admin"
   ): Promise<{ error: string | null }> => {
-    try {
-      const { data, error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: {
-            full_name: fullName,
-            phone: phone,
-            role: role,
-          },
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: {
+          full_name: fullName,
+          phone: phone,
+          role: role,
         },
-      });
+      },
+    });
 
-      if (error) return { error: error.message };
-      if (!data.user) return { error: "Sign up failed. Please try again." };
-
-      return { error: null };
-    } catch (err: any) {
-      return { error: err.message || "Sign up failed. Please try again." };
-    }
+    if (error) return { error: error.message };
+    if (!data.user) return { error: "Sign up failed. Please try again." };
+    return { error: null };
   };
 
   // SIGN IN
