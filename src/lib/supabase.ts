@@ -1,7 +1,31 @@
 import { createClient } from '@supabase/supabase-js'
 
-const supabaseUrl = (import.meta.env.VITE_SUPABASE_URL || "https://wkbkcjbtvzfbjkbovpac.supabase.co") as string
-const supabaseAnonKey = (import.meta.env.VITE_SUPABASE_ANON_KEY || "") as string
+// Get stored config if available in browser environment
+const getStoredConfig = () => {
+  if (typeof window !== "undefined") {
+    const storedUrl = localStorage.getItem("NESTLIST_SUPABASE_URL");
+    const storedKey = localStorage.getItem("NESTLIST_SUPABASE_ANON_KEY");
+    if (storedUrl && storedKey) {
+      return { url: storedUrl.trim(), key: storedKey.trim(), isUsingStored: true };
+    }
+  }
+  return {
+    url: ((import.meta.env.VITE_SUPABASE_URL || "https://wkbkcjbtvzfbjkbovpac.supabase.co") as string).trim(),
+    key: ((import.meta.env.VITE_SUPABASE_ANON_KEY || "") as string).trim(),
+    isUsingStored: false
+  };
+};
+
+const activeConfig = getStoredConfig();
+
+// Sanitize URL by removing trailing slash if present
+let rawUrl = activeConfig.url;
+if (rawUrl && rawUrl.endsWith('/')) {
+  rawUrl = rawUrl.slice(0, -1);
+}
+
+const supabaseUrl = rawUrl;
+const supabaseAnonKey = activeConfig.key;
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
@@ -14,7 +38,7 @@ export const getSupabaseConfig = () => {
     url: supabaseUrl,
     anonKey: supabaseAnonKey,
     isMock: false,
-    isUsingStored: false
+    isUsingStored: activeConfig.isUsingStored
   };
 };
 

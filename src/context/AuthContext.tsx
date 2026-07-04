@@ -238,6 +238,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return { error: null };
     } catch (error: any) {
       console.error("Signup exception caught:", error);
+      if (error.message && (error.message.includes('Invalid path') || error.message.includes('URL'))) {
+        return {
+          error: 'Sign up failed due to a configuration issue. Please try again.'
+        };
+      }
       return { error: error.message || "An error occurred during registration." };
     }
   };
