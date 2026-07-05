@@ -1,599 +1,593 @@
 import React, { useState, useEffect } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { supabase } from "../lib/supabase";
-import { Shield, Users, Landmark, FileText, CheckCircle2, XCircle, ToggleLeft, ToggleRight, Loader2, ArrowLeft, RefreshCw, KeyRound } from "lucide-react";
+import { 
+  Shield, Landmark, Users, Home, RefreshCw, Check, X, 
+  Loader2, ArrowLeft, Calendar, Coins, MapPin, User, Mail, 
+  Phone, Eye, Power, AlertCircle, FileText, CheckCircle2 
+} from "lucide-react";
 
-export const Admin: React.FC = () => {
+export const AdminPanel: React.FC = () => {
   const { profile } = useAuth();
-  const [activeTab, setActiveTab] = useState<"payments" | "properties" | "users" | "sms">("payments");
+  const navigate = useNavigate();
+  const [activeTab, setActiveTab] = useState<"payments" | "listings" | "users">("payments");
   const [loading, setLoading] = useState(true);
 
   // States
-  const [payments, setPayments] = useState<any[]>([]);
-  const [properties, setProperties] = useState<any[]>([]);
-  const [users, setUsers] = useState<any[]>([]);
-  const [smsLogs, setSmsLogs] = useState<any[]>([]);
+  const [pendingPayments, setPendingPayments] = useState<any[]>([]);
+  const [allListings, setAllListings] = useState<any[]>([]);
+  const [allUsers, setAllUsers] = useState<any[]>([]);
 
-  // Checking Admin Authorization
-  const authorized = profile?.role === "admin" || profile?.id === "admin-1" || profile?.id === "42eca9a0-c070-4898-b830-46c3247ea71d";
+  // Toast message state
+  const [toast, setToast] = useState<{ message: string; type: "success" | "error" | "info" } | null>(null);
 
-  const fetchAdminData = async () => {
-    setLoading(true);
+  // Helper to show custom notification toast
+  const showToast = (message: string, type: "success" | "error" | "info" = "success") => {
+    setToast({ message, type });
+    setTimeout(() => {
+      setToast(null);
+    }, 4500);
+  };
+
+  // Admin access validation
+  const isAdmin = profile?.role === "admin" || 
+                  profile?.email === "gardisonkirui11@gmail.com" || 
+                  profile?.id === "42eca9a0-c070-4898-b830-46c3247ea71d" || 
+                  profile?.id === "admin-1";
+
+  // Data Fetching functions
+  const fetchPendingPayments = async () => {
     try {
-      // 1. Fetch manual payment submissions from listing_payments
-      const { data: lpData } = await supabase
-        .from("listing_payments")
-        .select("*, landlord:profiles(full_name, phone), property:properties(title)")
-        .order("created_at", { ascending: false });
+      const { data, error } = await supabase
+        .from('listing_payments')
+        .select(`
+          *,
+          properties(title, type, price, location),
+          profiles!landlord_id(full_name, phone)
+        `)
+        .eq('status', 'pending')
+        .order('created_at', { ascending: true });
 
-      // Map listing_payments data into legacy property shapes for Admin page compatibility
-      const mappedPayments = (lpData || []).map((p: any) => ({
-        id: p.property_id,
-        title: p.property?.title || "Property Listing",
-        landlord: p.landlord,
-        amount_paid: p.amount_paid || p.amount,
-        mpesa_code: p.mpesa_code,
-        mpesa_phone: p.payer_phone,
-        payment_status: p.status === "confirmed"
-          ? "verified"
-          : p.status === "pending"
-            ? "pending_verification"
-            : p.status === "failed"
-              ? "rejected"
-              : "unpaid",
-        rejection_reason: p.failure_reason,
-        submitted_at: p.created_at
-      }));
-      setPayments(mappedPayments);
-
-      // 2. Fetch properties (all)
-      const { data: propData } = await supabase
-        .from("properties")
-        .select("*, landlord:profiles(full_name, phone)")
-        .order("created_at", { ascending: false });
-      setProperties(propData || []);
-
-      // 3. Fetch users / profiles
-      const { data: userData } = await supabase
-        .from("profiles")
-        .select("*")
-        .order("created_at", { ascending: false });
-      setUsers(userData || []);
-
-      // 4. Fetch SMS logs
-      const { data: smsData } = await supabase
-        .from("sms_logs")
-        .select("*")
-        .order("created_at", { ascending: false });
-      setSmsLogs(smsData || []);
-
-    } catch (err) {
-      console.error("Admin data loading failed:", err);
-    } finally {
-      setLoading(false);
+      if (error) throw error;
+      setPendingPayments(data || []);
+    } catch (err: any) {
+      console.error("Failed to fetch pending payments:", err);
+      showToast("Error loading pending payments: " + err.message, "error");
     }
   };
 
-  useEffect(() => {
-    if (authorized) {
-      fetchAdminData();
-    }
-  }, [profile, authorized]);
-
-  const handleApprovePayment = async (propertyId: string) => {
+  const fetchAllListings = async () => {
     try {
-      // Call backend verification endpoint
-      const response = await fetch(`/api/admin/payments/${propertyId}/verify`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ admin_id: profile?.id || "admin-1" })
-      });
+      const { data, error } = await supabase
+        .from('properties')
+        .select('*, profiles!landlord_id(full_name, phone)')
+        .order('created_at', { ascending: false });
 
-      const resData = await response.json();
-      if (!response.ok) {
-        throw new Error(resData.error || "Failed to approve payment on backend.");
-      }
+      if (error) throw error;
+      setAllListings(data || []);
+    } catch (err: any) {
+      console.error("Failed to fetch listings:", err);
+      showToast("Error loading listings: " + err.message, "error");
+    }
+  };
 
-      // Sync frontend database client locally
-      const { error: lpErr } = await supabase
-        .from("listing_payments")
-        .update({
-          status: "confirmed",
-          confirmed_at: new Date().toISOString()
+  const fetchAllUsers = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setAllUsers(data || []);
+    } catch (err: any) {
+      console.error("Failed to fetch users:", err);
+      showToast("Error loading users: " + err.message, "error");
+    }
+  };
+
+  // Consolidated loading handler based on active tab
+  const refreshData = async () => {
+    setLoading(true);
+    if (activeTab === "payments") {
+      await fetchPendingPayments();
+    } else if (activeTab === "listings") {
+      await fetchAllListings();
+    } else if (activeTab === "users") {
+      await fetchAllUsers();
+    }
+    setLoading(false);
+  };
+
+  // Trigger initial fetch when tab changes
+  useEffect(() => {
+    if (isAdmin) {
+      refreshData();
+    }
+  }, [activeTab, profile]);
+
+  // Action: Approve Payment
+  const handleApprovePayment = async (payment: any) => {
+    try {
+      // 1. Update payment status to confirmed
+      const { error: paymentError } = await supabase
+        .from('listing_payments')
+        .update({ 
+          status: 'confirmed', 
+          confirmed_at: new Date().toISOString() 
         })
-        .eq("property_id", propertyId);
+        .eq('id', payment.id);
 
-      if (lpErr) console.error("Client side listing_payments sync failed:", lpErr);
+      if (paymentError) throw paymentError;
 
-      const { error: propErr } = await supabase
-        .from("properties")
-        .update({
-          is_active: true,
+      // 2. Activate the property listing and set its expiry to 30 days
+      const { error: propertyError } = await supabase
+        .from('properties')
+        .update({ 
+          is_active: true, 
           expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
         })
-        .eq("id", propertyId);
+        .eq('id', payment.property_id);
 
-      if (propErr) console.error("Client side properties sync failed:", propErr);
+      if (propertyError) throw propertyError;
 
-      alert("Payment verified successfully. Listing is now live!");
-      fetchAdminData();
+      // Notify and filter the local UI state
+      showToast("✅ Listing approved and activated!", "success");
+      setPendingPayments(prev => prev.filter(p => p.id !== payment.id));
     } catch (err: any) {
-      alert(`Approval failed: ${err.message}`);
+      console.error("Failed to approve listing:", err);
+      showToast("Approval failed: " + err.message, "error");
     }
   };
 
-  const handleRejectPayment = async (propertyId: string) => {
-    const reason = prompt("Enter payment rejection reason:", "M-Pesa transaction reference code could not be verified on our statement.");
-    if (reason === null) return; // Prompt cancelled
-
+  // Action: Reject Payment
+  const handleRejectPayment = async (payment: any) => {
     try {
-      // Call backend rejection endpoint
-      const response = await fetch(`/api/admin/payments/${propertyId}/reject`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          admin_id: profile?.id || "admin-1",
-          reason: reason
+      const { error } = await supabase
+        .from('listing_payments')
+        .update({ 
+          status: 'failed', 
+          failure_reason: 'Rejected by admin' 
         })
-      });
+        .eq('id', payment.id);
 
-      const resData = await response.json();
-      if (!response.ok) {
-        throw new Error(resData.error || "Failed to reject payment on backend.");
+      if (error) throw error;
+
+      showToast("❌ Payment rejected", "info");
+      setPendingPayments(prev => prev.filter(p => p.id !== payment.id));
+    } catch (err: any) {
+      console.error("Failed to reject payment:", err);
+      showToast("Rejection failed: " + err.message, "error");
+    }
+  };
+
+  // Action: Toggle Listing Activation (Tab 2)
+  const handleToggleListingActive = async (property: any) => {
+    const nextActive = !property.is_active;
+    try {
+      // Setup payload, including expires_at updates if activating
+      const payload: any = { is_active: nextActive };
+      if (nextActive) {
+        payload.expires_at = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+      } else {
+        payload.expires_at = null;
       }
 
-      // Sync frontend database client locally
-      const { error: lpErr } = await supabase
-        .from("listing_payments")
-        .update({
-          status: "failed",
-          failure_reason: reason
-        })
-        .eq("property_id", propertyId);
-
-      if (lpErr) console.error("Client side listing_payments sync failed:", lpErr);
-
-      const { error: propErr } = await supabase
-        .from("properties")
-        .update({
-          is_active: false
-        })
-        .eq("id", propertyId);
-
-      if (propErr) console.error("Client side properties sync failed:", propErr);
-
-      alert("Payment verification rejected successfully.");
-      fetchAdminData();
-    } catch (err: any) {
-      alert(`Rejection failed: ${err.message}`);
-    }
-  };
-
-  const handleToggleListingActive = async (propertyId: string, currentActive: boolean) => {
-    try {
-      // Toggle property state (Service role simulation)
       const { error } = await supabase
-        .from("properties")
-        .update({
-          is_active: !currentActive,
-          expires_at: !currentActive ? new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() : null
-        })
-        .eq("id", propertyId);
+        .from('properties')
+        .update(payload)
+        .eq('id', property.id);
 
       if (error) throw error;
 
-      setProperties(prev =>
-        prev.map(p => (p.id === propertyId ? { ...p, is_active: !currentActive } : p))
-      );
+      showToast(`Property listing successfully ${nextActive ? "activated" : "deactivated"}!`, "success");
+      
+      // Update local state instantly
+      setAllListings(prev => prev.map(p => 
+        p.id === property.id 
+          ? { ...p, is_active: nextActive, expires_at: payload.expires_at } 
+          : p
+      ));
     } catch (err: any) {
-      alert(`Toggle failed: ${err.message}`);
+      console.error("Failed to toggle property state:", err);
+      showToast("Error updating listing status: " + err.message, "error");
     }
   };
 
-  const handleDeleteProperty = async (propertyId: string) => {
-    if (!window.confirm("Are you sure you want to delete this listing permanently? This action cannot be undone.")) return;
-    try {
-      const { error } = await supabase
-        .from("properties")
-        .delete()
-        .eq("id", propertyId);
-
-      if (error) throw error;
-
-      setProperties(prev => prev.filter(p => p.id !== propertyId));
-      alert("Listing deleted successfully.");
-    } catch (err: any) {
-      alert(`Deletion failed: ${err.message}`);
-    }
-  };
-
-  const handleDeleteUser = async (userId: string) => {
-    if (userId === "admin-1" || userId === profile?.id) {
-      alert("You cannot delete yourself or the main system administrator account.");
-      return;
-    }
-    if (!window.confirm("Are you sure you want to delete this user profile permanently? All associated listings and alerts will be removed.")) return;
-    try {
-      const { error } = await supabase
-        .from("profiles")
-        .delete()
-        .eq("id", userId);
-
-      if (error) throw error;
-
-      setUsers(prev => prev.filter(u => u.id !== userId));
-      alert("User profile deleted successfully.");
-    } catch (err: any) {
-      alert(`Deletion failed: ${err.message}`);
-    }
-  };
-
-  const handleToggleUserRole = async (userId: string, currentRole: string) => {
-    if (userId === "admin-1" || userId === profile?.id) {
-      alert("You cannot modify your own role or the main system administrator account.");
-      return;
-    }
-    
-    // Rotate through roles: tenant -> landlord -> user -> admin
-    const nextRole = currentRole === "tenant" 
-      ? "landlord" 
-      : currentRole === "landlord" 
-        ? "user" 
-        : currentRole === "user" 
-          ? "admin" 
-          : "tenant";
-
-    try {
-      const { error } = await supabase
-        .from("profiles")
-        .update({ role: nextRole })
-        .eq("id", userId);
-
-      if (error) throw error;
-
-      setUsers(prev => prev.map(u => u.id === userId ? { ...u, role: nextRole } : u));
-      alert(`User role updated to "${nextRole}" successfully.`);
-    } catch (err: any) {
-      alert(`Role change failed: ${err.message}`);
-    }
-  };
-
-  if (!authorized) {
+  if (!isAdmin) {
     return (
-      <div className="mx-auto max-w-md px-4 py-16 text-center space-y-6">
-        <div className="mx-auto h-12 w-12 bg-red-50 text-red-600 rounded-full flex items-center justify-center">
-          <Shield className="h-6 w-6" />
+      <div className="max-w-md mx-auto py-20 px-4 text-center font-sans" id="admin-forbidden-view">
+        <div className="p-3 bg-rose-50 border border-rose-100 rounded-full w-14 h-14 flex items-center justify-center text-rose-700 mx-auto mb-5">
+          <Shield className="h-7 w-7" />
         </div>
-        <h2 className="text-xl font-bold text-stone-900">Admin Area Access Restricted</h2>
-        <p className="text-stone-500 text-sm leading-relaxed">
-          This portal is protected and only accessible by authorized system administrators (e.g. `thesilentwhisper.ke@gmail.com`).
+        <h1 className="text-xl font-bold text-stone-900 tracking-tight">Access Restricted</h1>
+        <p className="text-stone-500 text-sm mt-2 mb-6 leading-relaxed">
+          The Admin Portal is exclusive to verified platform administrators.
         </p>
-        <div className="pt-2">
-          <Link to="/" className="inline-flex items-center space-x-1.5 py-2 px-4 bg-stone-900 hover:bg-stone-800 text-white rounded-lg text-sm font-semibold transition">
-            <ArrowLeft className="h-4 w-4" />
-            <span>Go to Browse</span>
-          </Link>
-        </div>
+        <Link 
+          to="/" 
+          className="inline-flex items-center gap-1.5 bg-gradient-to-r from-emerald-800 to-emerald-700 hover:from-emerald-750 hover:to-emerald-650 text-white font-medium text-xs py-2 px-5 rounded-full shadow-sm hover:shadow transition-all active:scale-95"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          <span>Return to Homepage</span>
+        </Link>
       </div>
     );
   }
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 space-y-6">
-      
-      {/* Admin Title */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-stone-200">
-        <div className="space-y-1">
-          <h1 className="text-xl sm:text-2xl font-bold text-stone-950 font-sans flex items-center space-x-2">
-            <Shield className="h-6 w-6 text-amber-700" />
-            <span>System Administration Portal</span>
-          </h1>
-          <p className="text-stone-500 text-xs sm:text-sm font-medium">
-            Review audit logs, override Safaricom status billing, inspect user logs, and SMS queues.
+    <div className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8 font-sans" id="admin-panel-page">
+      {/* Toast Notification Container */}
+      {toast && (
+        <div 
+          className={`fixed top-20 right-4 z-50 flex items-center gap-2.5 py-3 px-5 rounded-xl border shadow-lg text-sm transition-all duration-300 animate-fade-in ${
+            toast.type === "success" 
+              ? "bg-emerald-50 border-emerald-100 text-emerald-800"
+              : toast.type === "info"
+              ? "bg-stone-800 border-stone-700 text-stone-100"
+              : "bg-rose-50 border-rose-100 text-rose-800"
+          }`}
+          id="admin-toast-message"
+        >
+          {toast.type === "success" && <CheckCircle2 className="h-4.5 w-4.5 text-emerald-600 shrink-0" />}
+          {toast.type === "info" && <AlertCircle className="h-4.5 w-4.5 text-amber-500 shrink-0" />}
+          {toast.type === "error" && <AlertCircle className="h-4.5 w-4.5 text-rose-600 shrink-0" />}
+          <p className="font-semibold">{toast.message}</p>
+        </div>
+      )}
+
+      {/* Header Panel */}
+      <div className="bg-white border border-stone-200/80 rounded-2xl p-6 mb-8 shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+        <div>
+          <div className="flex items-center gap-2">
+            <div className="p-1.5 bg-amber-50 text-amber-800 rounded-lg border border-amber-200/50">
+              <Shield className="h-5 w-5" />
+            </div>
+            <h1 className="text-xl font-bold text-stone-900 tracking-tight">Nestlist Admin Hub</h1>
+          </div>
+          <p className="text-stone-500 text-xs mt-1 font-medium">
+            Verified Administrator Terminal • Managed by <span className="font-mono text-stone-750 font-bold">gardisonkirui11@gmail.com</span>
           </p>
         </div>
 
         <button
-          onClick={fetchAdminData}
-          className="inline-flex items-center space-x-1 py-2 px-3 border border-stone-300 hover:bg-stone-50 rounded-lg text-xs font-semibold text-stone-600 transition"
+          onClick={refreshData}
+          disabled={loading}
+          className="flex items-center gap-1.5 border border-stone-200 hover:bg-stone-50 text-stone-600 hover:text-stone-900 font-medium text-xs py-2 px-4 rounded-full transition active:scale-95 cursor-pointer shrink-0 disabled:opacity-45"
+          id="admin-global-refresh-btn"
         >
-          <RefreshCw className="h-3.5 w-3.5" />
-          <span>Refresh Console</span>
+          <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin text-amber-600" : ""}`} />
+          <span>Refresh Data</span>
         </button>
       </div>
 
-      {/* Admin tabs */}
-      <div className="flex space-x-4 border-b border-stone-200">
+      {/* Segmented Tab Controls */}
+      <div className="flex border-b border-stone-200 mb-8 overflow-x-auto shrink-0 pb-px gap-2" id="admin-segmented-tabs">
         <button
           onClick={() => setActiveTab("payments")}
-          className={`py-2.5 text-sm font-bold border-b-2 transition flex items-center space-x-1.5 ${
-            activeTab === "payments" ? "border-amber-600 text-amber-900" : "border-transparent text-stone-500 hover:text-stone-900"
+          className={`relative py-3 px-4 font-sans font-bold text-xs uppercase tracking-wider transition-all duration-150 border-b-2 whitespace-nowrap flex items-center gap-2 ${
+            activeTab === "payments" 
+              ? "border-emerald-700 text-emerald-800" 
+              : "border-transparent text-stone-500 hover:text-stone-800"
           }`}
+          id="tab-btn-pending-payments"
         >
-          <Landmark className="h-4 w-4" />
-          <span>M-Pesa Receipts ({payments.length})</span>
+          <Landmark className="h-4 w-4 shrink-0" />
+          <span>Pending Payments</span>
+          <span className={`text-[10px] py-0.5 px-2 rounded-full font-bold ${
+            activeTab === "payments"
+              ? "bg-emerald-50 text-emerald-800 border border-emerald-100"
+              : "bg-stone-100 text-stone-600"
+          }`}>
+            {pendingPayments.length}
+          </span>
         </button>
 
         <button
-          onClick={() => setActiveTab("properties")}
-          className={`py-2.5 text-sm font-bold border-b-2 transition flex items-center space-x-1.5 ${
-            activeTab === "properties" ? "border-amber-600 text-amber-900" : "border-transparent text-stone-500 hover:text-stone-900"
+          onClick={() => setActiveTab("listings")}
+          className={`relative py-3 px-4 font-sans font-bold text-xs uppercase tracking-wider transition-all duration-150 border-b-2 whitespace-nowrap flex items-center gap-2 ${
+            activeTab === "listings" 
+              ? "border-emerald-700 text-emerald-800" 
+              : "border-transparent text-stone-500 hover:text-stone-800"
           }`}
+          id="tab-btn-all-listings"
         >
-          <Shield className="h-4 w-4" />
-          <span>Listing Overrides ({properties.length})</span>
+          <Home className="h-4 w-4 shrink-0" />
+          <span>All Listings</span>
+          <span className="text-[10px] bg-stone-100 text-stone-600 py-0.5 px-2 rounded-full font-bold">
+            {allListings.length}
+          </span>
         </button>
 
         <button
           onClick={() => setActiveTab("users")}
-          className={`py-2.5 text-sm font-bold border-b-2 transition flex items-center space-x-1.5 ${
-            activeTab === "users" ? "border-amber-600 text-amber-900" : "border-transparent text-stone-500 hover:text-stone-900"
+          className={`relative py-3 px-4 font-sans font-bold text-xs uppercase tracking-wider transition-all duration-150 border-b-2 whitespace-nowrap flex items-center gap-2 ${
+            activeTab === "users" 
+              ? "border-emerald-700 text-emerald-800" 
+              : "border-transparent text-stone-500 hover:text-stone-800"
           }`}
+          id="tab-btn-all-users"
         >
-          <Users className="h-4 w-4" />
-          <span>User Profiles ({users.length})</span>
-        </button>
-
-        <button
-          onClick={() => setActiveTab("sms")}
-          className={`py-2.5 text-sm font-bold border-b-2 transition flex items-center space-x-1.5 ${
-            activeTab === "sms" ? "border-amber-600 text-amber-900" : "border-transparent text-stone-500 hover:text-stone-900"
-          }`}
-        >
-          <FileText className="h-4 w-4" />
-          <span>SMS delivery queue ({smsLogs.length})</span>
+          <Users className="h-4 w-4 shrink-0" />
+          <span>All Users</span>
+          <span className="text-[10px] bg-stone-100 text-stone-600 py-0.5 px-2 rounded-full font-bold">
+            {allUsers.length}
+          </span>
         </button>
       </div>
 
-      {/* Contents */}
+      {/* Main Tab Render Space */}
       {loading ? (
-        <div className="flex justify-center py-20 animate-pulse">
-          <Loader2 className="h-8 w-8 text-amber-600 animate-spin" />
-        </div>
-      ) : activeTab === "payments" ? (
-        /* MPESA PAYMENTS VIEW */
-        <div className="bg-white rounded-2xl border border-stone-200 shadow-sm overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse text-xs sm:text-sm">
-              <thead className="bg-stone-50 text-stone-400 font-bold uppercase border-b border-stone-200">
-                <tr>
-                  <th className="p-4">Landlord</th>
-                  <th className="p-4">Property</th>
-                  <th className="p-4">Amount</th>
-                  <th className="p-4">M-Pesa Info</th>
-                  <th className="p-4">Status</th>
-                  <th className="p-4 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-stone-150">
-                {payments.length === 0 ? (
-                  <tr>
-                    <td colSpan={6} className="p-8 text-center text-stone-400 font-medium">No manual payment transactions registered yet.</td>
-                  </tr>
-                ) : (
-                  payments.map((p) => (
-                    <tr key={p.id} className="hover:bg-stone-50/50">
-                      <td className="p-4">
-                        <p className="font-bold text-stone-900">{p.landlord?.full_name || "Landlord"}</p>
-                        <p className="text-stone-400 text-[10px]">{p.landlord?.phone || "N/A"}</p>
-                      </td>
-                      <td className="p-4 max-w-xs truncate font-medium text-stone-700">
-                        {p.title || "Property Listing"}
-                      </td>
-                      <td className="p-4 font-mono font-bold text-emerald-700">
-                        KSh {(parseFloat(p.amount_paid) || 0).toLocaleString()}
-                      </td>
-                      <td className="p-4">
-                        <p className="font-mono text-xs font-bold text-stone-850">{p.mpesa_code || "N/A"}</p>
-                        {p.mpesa_phone && (
-                          <p className="text-[10px] text-stone-400 font-mono">{p.mpesa_phone}</p>
-                        )}
-                      </td>
-                      <td className="p-4">
-                        <div className="space-y-1">
-                          <span className={`inline-block text-[10px] font-bold uppercase px-2.5 py-0.5 rounded-full ${
-                            p.payment_status === "verified"
-                              ? "bg-emerald-50 text-emerald-700 border border-emerald-100"
-                              : p.payment_status === "pending_verification"
-                              ? "bg-amber-50 text-amber-700 border border-amber-100 animate-pulse"
-                              : "bg-red-50 text-red-700 border border-red-100"
-                          }`}>
-                            {p.payment_status === "pending_verification" ? "pending verification" : p.payment_status}
-                          </span>
-                          {p.rejection_reason && (
-                            <p className="text-[10px] text-red-500 max-w-xs truncate" title={p.rejection_reason}>
-                              Reason: {p.rejection_reason}
-                            </p>
-                          )}
-                        </div>
-                      </td>
-                      <td className="p-4 text-right">
-                        {p.payment_status === "pending_verification" && (
-                          <div className="flex justify-end gap-2">
-                            <button
-                              onClick={() => handleApprovePayment(p.id)}
-                              className="py-1 px-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-xs font-bold transition shadow-sm"
-                            >
-                              Verify
-                            </button>
-                            <button
-                              onClick={() => handleRejectPayment(p.id)}
-                              className="py-1 px-2.5 bg-red-650 hover:bg-red-700 text-white rounded text-xs font-bold transition shadow-sm"
-                            >
-                              Reject
-                            </button>
-                          </div>
-                        )}
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      ) : activeTab === "properties" ? (
-        /* PROPERTIES MANAGEMENT */
-        <div className="bg-white rounded-2xl border border-stone-200 shadow-sm overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse text-xs sm:text-sm">
-              <thead className="bg-stone-50 text-stone-400 font-bold uppercase border-b border-stone-200">
-                <tr>
-                  <th className="p-4">Listing Title</th>
-                  <th className="p-4">Landlord</th>
-                  <th className="p-4">County / Estate</th>
-                  <th className="p-4">Rent</th>
-                  <th className="p-4">Active State</th>
-                  <th className="p-4 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-stone-150">
-                {properties.map((p) => (
-                  <tr key={p.id} className="hover:bg-stone-50/50">
-                    <td className="p-4 font-bold text-stone-900 max-w-xs truncate">{p.title}</td>
-                    <td className="p-4 text-stone-700">{p.landlord?.full_name || "Unknown"}</td>
-                    <td className="p-4 text-stone-600">{p.location}, {p.county}</td>
-                    <td className="p-4 font-mono font-bold">KSh {parseFloat(p.price).toLocaleString()}</td>
-                    <td className="p-4">
-                      <button
-                        onClick={() => handleToggleListingActive(p.id, p.is_active)}
-                        className="flex items-center text-stone-500 transition focus:outline-none"
-                      >
-                        {p.is_active ? (
-                          <div className="flex items-center space-x-1 text-emerald-600">
-                            <ToggleRight className="h-7 w-7" />
-                            <span className="text-[10px] font-bold uppercase">Active</span>
-                          </div>
-                        ) : (
-                          <div className="flex items-center space-x-1 text-stone-400">
-                            <ToggleLeft className="h-7 w-7" />
-                            <span className="text-[10px] font-bold uppercase">Inactive</span>
-                          </div>
-                        )}
-                      </button>
-                    </td>
-                    <td className="p-4 text-right">
-                      <button
-                        onClick={() => handleDeleteProperty(p.id)}
-                        className="py-1 px-2.5 bg-red-50 hover:bg-red-100 text-red-600 font-bold rounded text-xs transition shadow-xs"
-                      >
-                        Delete
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      ) : activeTab === "users" ? (
-        /* USER PROFILES VIEW */
-        <div className="bg-white rounded-2xl border border-stone-200 shadow-sm overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse text-xs sm:text-sm">
-              <thead className="bg-stone-50 text-stone-400 font-bold uppercase border-b border-stone-200">
-                <tr>
-                  <th className="p-4">Profile Name</th>
-                  <th className="p-4">Phone Number</th>
-                  <th className="p-4">Account Role</th>
-                  <th className="p-4">Registered Date</th>
-                  <th className="p-4 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-stone-150">
-                {users.map((u) => (
-                  <tr key={u.id} className="hover:bg-stone-50/50">
-                    <td className="p-4 font-bold text-stone-900">{u.full_name}</td>
-                    <td className="p-4 font-mono">{u.phone || "No phone connected"}</td>
-                    <td className="p-4">
-                      <div className="flex items-center space-x-2">
-                        <span className={`text-[10px] font-bold uppercase px-2.5 py-0.5 rounded-full ${
-                          u.role === "admin"
-                            ? "bg-purple-100 text-purple-800"
-                            : u.role === "landlord"
-                              ? "bg-amber-100 text-amber-800"
-                              : u.role === "tenant"
-                                ? "bg-blue-100 text-blue-800"
-                                : "bg-stone-100 text-stone-700"
-                        }`}>
-                          {u.role}
-                        </span>
-                        {u.id !== "admin-1" && u.id !== profile?.id && (
-                          <button
-                            onClick={() => handleToggleUserRole(u.id, u.role)}
-                            className="text-[10px] text-amber-600 hover:text-amber-800 underline font-medium focus:outline-none"
-                            title="Rotate through roles: tenant -> landlord -> user -> admin"
-                          >
-                            Change Role
-                          </button>
-                        )}
-                      </div>
-                    </td>
-                    <td className="p-4 text-stone-400 text-xs">{new Date(u.created_at).toLocaleString()}</td>
-                    <td className="p-4 text-right">
-                      {u.id !== "admin-1" && u.id !== profile?.id && (
-                        <button
-                          onClick={() => handleDeleteUser(u.id)}
-                          className="py-1 px-2.5 bg-red-50 hover:bg-red-100 text-red-600 font-bold rounded text-xs transition"
-                        >
-                          Delete
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+        <div className="flex flex-col items-center justify-center py-20 bg-white border border-stone-200/80 rounded-2xl shadow-xs">
+          <Loader2 className="h-8 w-8 animate-spin text-emerald-700 mb-3" />
+          <p className="text-stone-500 text-xs font-semibold uppercase tracking-wider">Syncing Database...</p>
         </div>
       ) : (
-        /* SMS Logs Queue */
-        <div className="bg-white rounded-2xl border border-stone-200 shadow-sm overflow-hidden space-y-4">
-          <div className="p-4 bg-amber-50/50 text-xs sm:text-sm text-stone-700 font-medium border-b border-stone-200 leading-normal">
-            Africa's Talking SMS delivery reports pipeline. Logs all outgoing landlord leads, payments, registration welcomes, and matching county search subscriptions.
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse text-xs sm:text-sm">
-              <thead className="bg-stone-50 text-stone-400 font-bold uppercase border-b border-stone-200">
-                <tr>
-                  <th className="p-4">Recipient</th>
-                  <th className="p-4">Log Event</th>
-                  <th className="p-4">Message Body</th>
-                  <th className="p-4">Rate Cost</th>
-                  <th className="p-4">Status</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-stone-150">
-                {smsLogs.length === 0 ? (
-                  <tr>
-                    <td colSpan={5} className="p-8 text-center text-stone-400 font-medium">No SMS messages triggered yet in this session.</td>
-                  </tr>
-                ) : (
-                  smsLogs.map((log) => (
-                    <tr key={log.id} className="hover:bg-stone-50/50">
-                      <td className="p-4 font-mono font-bold text-stone-900">{log.recipient_phone}</td>
-                      <td className="p-4 text-stone-400 text-[10px] uppercase font-bold">{log.type.replace("_", " ")}</td>
-                      <td className="p-4 text-stone-700 max-w-sm font-medium">{log.message}</td>
-                      <td className="p-4 font-mono text-stone-500">{log.cost || "KSh 0.80"}</td>
-                      <td className="p-4">
-                        <span className={`text-[10px] font-bold uppercase px-2.5 py-0.5 rounded-full ${
-                          log.status === "sent"
-                            ? "bg-emerald-50 text-emerald-700 border border-emerald-100"
-                            : "bg-red-50 text-red-700 border border-red-100"
-                        }`}>
-                          {log.status}
+        <div id="admin-tab-content-container">
+          
+          {/* ==================== TAB 1: PENDING PAYMENTS ==================== */}
+          {activeTab === "payments" && (
+            <div>
+              {pendingPayments.length === 0 ? (
+                <div className="text-center py-16 px-4 bg-white border border-stone-200/80 rounded-2xl shadow-xs animate-fade-in" id="empty-payments-state">
+                  <div className="mx-auto w-12 h-12 rounded-full bg-emerald-50 text-emerald-700 flex items-center justify-center border border-emerald-100 mb-4">
+                    <Check className="h-6 w-6" />
+                  </div>
+                  <h3 className="text-base font-bold text-stone-900">All caught up! No pending payments.</h3>
+                  <p className="text-stone-500 text-xs mt-1 max-w-sm mx-auto leading-relaxed">
+                    All landlords' manual M-Pesa submissions have been successfully processed and cataloged.
+                  </p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" id="pending-payments-cards-grid">
+                  {pendingPayments.map((payment) => (
+                    <div 
+                      key={payment.id} 
+                      className="bg-white border border-stone-200/85 rounded-2xl shadow-sm hover:shadow transition-all duration-200 flex flex-col overflow-hidden animate-fade-in"
+                      id={`payment-card-${payment.id}`}
+                    >
+                      {/* Card Top Banner / Status Indicator */}
+                      <div className="bg-amber-500/5 px-4 py-3 border-b border-stone-100 flex items-center justify-between">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-amber-800 bg-amber-50 border border-amber-200/40 py-0.5 px-2 rounded-full">
+                          M-Pesa Verification Needed
                         </span>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
+                        <span className="text-[10px] text-stone-400 font-semibold font-mono">
+                          {new Date(payment.created_at).toLocaleDateString("en-KE")}
+                        </span>
+                      </div>
+
+                      {/* Card Content Area */}
+                      <div className="p-5 flex-1 space-y-4">
+                        {/* Landlord Contact Info */}
+                        <div className="space-y-1">
+                          <span className="block text-[10px] font-bold uppercase tracking-wider text-stone-400">Landlord Details</span>
+                          <div className="flex items-center gap-1.5 text-stone-800">
+                            <User className="h-4 w-4 text-stone-400 shrink-0" />
+                            <p className="font-bold text-sm">{payment.profiles?.full_name || "Unknown Landlord"}</p>
+                          </div>
+                          <div className="flex items-center gap-1.5 text-stone-500 text-xs font-medium font-mono">
+                            <Phone className="h-3.5 w-3.5 text-stone-400 shrink-0" />
+                            <span>{payment.profiles?.phone || "N/A"}</span>
+                          </div>
+                        </div>
+
+                        {/* Property Details */}
+                        <div className="space-y-1 pt-3 border-t border-stone-100">
+                          <span className="block text-[10px] font-bold uppercase tracking-wider text-stone-400">Property Information</span>
+                          <p className="font-bold text-sm text-stone-900 leading-snug">{payment.properties?.title || "Property Listing"}</p>
+                          <div className="flex items-center gap-1 text-xs text-stone-500 font-semibold capitalize">
+                            <MapPin className="h-3.5 w-3.5 text-stone-400 shrink-0" />
+                            <span>{payment.properties?.type || "Unit"} • {payment.properties?.location || "N/A"}</span>
+                          </div>
+                        </div>
+
+                        {/* M-Pesa Transaction Code display */}
+                        <div className="bg-stone-50/70 border border-stone-200/80 rounded-xl p-3.5 text-center space-y-1">
+                          <span className="block text-[9.5px] font-bold uppercase tracking-widest text-stone-400">M-PESA Code</span>
+                          <p className="text-lg font-black font-mono tracking-wider text-stone-900 uppercase">
+                            {payment.mpesa_code || "N/A"}
+                          </p>
+                          {payment.payer_phone && (
+                            <span className="block text-[10px] text-stone-400 font-mono">Sender: {payment.payer_phone}</span>
+                          )}
+                        </div>
+
+                        {/* Expected fee vs submitted payment values */}
+                        <div className="grid grid-cols-2 gap-3 pt-1 text-center">
+                          <div className="p-2 border border-stone-100 rounded-lg">
+                            <span className="block text-[9px] font-bold text-stone-400 uppercase">Amount Paid</span>
+                            <span className="text-xs font-bold text-emerald-800">
+                              KSh {(payment.amount_paid || 0).toLocaleString()}
+                            </span>
+                          </div>
+                          <div className="p-2 border border-stone-100 rounded-lg">
+                            <span className="block text-[9px] font-bold text-stone-400 uppercase">Expected Fee</span>
+                            <span className="text-xs font-bold text-stone-600">
+                              KSh {(payment.amount || 0).toLocaleString()}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Action Buttons */}
+                      <div className="px-4 py-3 bg-stone-50 border-t border-stone-100 grid grid-cols-2 gap-2">
+                        <button
+                          onClick={() => handleRejectPayment(payment)}
+                          className="flex items-center justify-center gap-1 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 font-semibold text-xs rounded-xl transition cursor-pointer border border-rose-200/40 active:scale-95"
+                        >
+                          <X className="h-3.5 w-3.5" />
+                          <span>Reject</span>
+                        </button>
+                        
+                        <button
+                          onClick={() => handleApprovePayment(payment)}
+                          className="flex items-center justify-center gap-1 py-2 bg-emerald-700 hover:bg-emerald-850 text-white font-semibold text-xs rounded-xl transition cursor-pointer shadow-sm active:scale-95"
+                        >
+                          <Check className="h-3.5 w-3.5" />
+                          <span>Approve</span>
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ==================== TAB 2: ALL LISTINGS ==================== */}
+          {activeTab === "listings" && (
+            <div className="bg-white border border-stone-200/80 rounded-2xl shadow-sm overflow-hidden animate-fade-in" id="all-listings-table-container">
+              {allListings.length === 0 ? (
+                <div className="text-center py-16 text-stone-500 font-medium">No active or pending listings found.</div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse text-xs sm:text-sm">
+                    <thead className="bg-stone-50 text-stone-400 font-bold uppercase border-b border-stone-200">
+                      <tr>
+                        <th className="p-4">Title</th>
+                        <th className="p-4">Type</th>
+                        <th className="p-4">Price</th>
+                        <th className="p-4">Landlord</th>
+                        <th className="p-4">Status</th>
+                        <th className="p-4">Expires</th>
+                        <th className="p-4 text-right">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-stone-150 text-stone-700 font-medium">
+                      {allListings.map((property) => (
+                        <tr key={property.id} className="hover:bg-stone-50/40">
+                          {/* Title & Location Column */}
+                          <td className="p-4">
+                            <p className="font-bold text-stone-900 max-w-xs truncate" title={property.title}>
+                              {property.title}
+                            </p>
+                            <span className="block text-[10px] text-stone-400 font-medium">{property.location}</span>
+                          </td>
+                          {/* Type */}
+                          <td className="p-4 text-stone-500 capitalize">{property.type || "Apartment"}</td>
+                          {/* Price */}
+                          <td className="p-4 font-mono font-bold text-stone-800">
+                            KSh {(parseFloat(property.price) || 0).toLocaleString()}
+                          </td>
+                          {/* Landlord Info */}
+                          <td className="p-4">
+                            <p className="font-bold text-stone-900 text-xs">
+                              {property.profiles?.full_name || "Unknown Landlord"}
+                            </p>
+                            <span className="block text-[10px] text-stone-400 font-mono">
+                              {property.profiles?.phone || "N/A"}
+                            </span>
+                          </td>
+                          {/* Status Badge */}
+                          <td className="p-4">
+                            <span className={`inline-block text-[9.5px] font-black uppercase px-2 py-0.5 rounded-full ${
+                              property.is_active 
+                                ? "bg-emerald-50 text-emerald-850 border border-emerald-100" 
+                                : "bg-stone-100 text-stone-500 border border-stone-200/50"
+                            }`}>
+                              {property.is_active ? "Active" : "Inactive"}
+                            </span>
+                          </td>
+                          {/* Expiration date */}
+                          <td className="p-4 text-xs font-mono text-stone-500">
+                            {property.expires_at 
+                              ? new Date(property.expires_at).toLocaleDateString("en-KE", { dateStyle: "medium" }) 
+                              : "No expiry set"
+                            }
+                          </td>
+                          {/* Actions Column */}
+                          <td className="p-4 text-right">
+                            <button
+                              onClick={() => handleToggleListingActive(property)}
+                              className={`inline-flex items-center gap-1 font-semibold text-xs py-1.5 px-3 rounded-full border transition cursor-pointer active:scale-95 ${
+                                property.is_active
+                                  ? "bg-rose-50 hover:bg-rose-100 border-rose-200/40 text-rose-700"
+                                  : "bg-emerald-50 hover:bg-emerald-100 border-emerald-200/40 text-emerald-800"
+                              }`}
+                            >
+                              <Power className="h-3 w-3 shrink-0" />
+                              <span>{property.is_active ? "Deactivate" : "Activate"}</span>
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ==================== TAB 3: ALL USERS ==================== */}
+          {activeTab === "users" && (
+            <div className="bg-white border border-stone-200/80 rounded-2xl shadow-sm overflow-hidden animate-fade-in" id="all-users-table-container">
+              {allUsers.length === 0 ? (
+                <div className="text-center py-16 text-stone-500 font-medium">No registered profiles registered.</div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse text-xs sm:text-sm">
+                    <thead className="bg-stone-50 text-stone-400 font-bold uppercase border-b border-stone-200">
+                      <tr>
+                        <th className="p-4">Name</th>
+                        <th className="p-4">Email</th>
+                        <th className="p-4">Role</th>
+                        <th className="p-4">Phone</th>
+                        <th className="p-4">Joined</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-stone-150 text-stone-700 font-medium">
+                      {allUsers.map((user) => (
+                        <tr key={user.id} className="hover:bg-stone-50/40">
+                          {/* Avatar & Name */}
+                          <td className="p-4">
+                            <div className="flex items-center gap-2.5">
+                              {user.avatar_url ? (
+                                <img 
+                                  src={user.avatar_url} 
+                                  alt={user.full_name || "Profile"} 
+                                  className="h-7 w-7 rounded-full object-cover shrink-0 border border-stone-200"
+                                  referrerPolicy="no-referrer"
+                                />
+                              ) : (
+                                <div className="h-7 w-7 rounded-full bg-stone-100 flex items-center justify-center text-stone-500 shrink-0 border border-stone-200">
+                                  <User className="h-3.5 w-3.5" />
+                                </div>
+                              )}
+                              <p className="font-bold text-stone-900">{user.full_name || "NestList User"}</p>
+                            </div>
+                          </td>
+                          {/* Email */}
+                          <td className="p-4 text-stone-600 font-semibold">{user.email || "N/A"}</td>
+                          {/* Role Badge */}
+                          <td className="p-4">
+                            <span className={`inline-block text-[10px] font-bold uppercase px-2.5 py-0.5 rounded-full ${
+                              user.role === "admin"
+                                ? "bg-amber-100 text-amber-900 border border-amber-200/40"
+                                : user.role === "landlord"
+                                ? "bg-emerald-50 text-emerald-850 border border-emerald-100"
+                                : "bg-blue-50 text-blue-800 border border-blue-100"
+                            }`}>
+                              {user.role || "tenant"}
+                            </span>
+                          </td>
+                          {/* Phone */}
+                          <td className="p-4 font-mono font-semibold text-stone-600">{user.phone || "N/A"}</td>
+                          {/* Joined Date */}
+                          <td className="p-4 text-xs font-mono text-stone-400">
+                            {new Date(user.created_at).toLocaleDateString("en-KE", { dateStyle: "medium" })}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
+
         </div>
       )}
-
     </div>
   );
 };

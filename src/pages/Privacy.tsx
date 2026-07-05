@@ -1,655 +1,660 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { Link } from "react-router-dom";
-import { ArrowLeft, Shield, Clock, FileText, CheckCircle2 } from "lucide-react";
+import { Shield, Mail, Phone, ExternalLink, Calendar, CheckCircle2, AlertTriangle, ArrowUp } from "lucide-react";
 
 export const Privacy: React.FC = () => {
+  useEffect(() => {
+    // 1. Update document Title
+    document.title = "Privacy Policy — NestList Kenya";
+
+    // 2. Set Meta Description
+    let metaDesc = document.querySelector('meta[name="description"]');
+    if (!metaDesc) {
+      metaDesc = document.createElement("meta");
+      metaDesc.setAttribute("name", "description");
+      document.head.appendChild(metaDesc);
+    }
+    metaDesc.setAttribute(
+      "content",
+      "Learn how NestList collects, uses and protects your personal information. Nestlist Rental Platforms Limited complies with Kenya's Data Protection Act 2019."
+    );
+
+    // 3. Set Canonical Link
+    let canonical = document.querySelector('link[rel="canonical"]');
+    if (!canonical) {
+      canonical = document.createElement("link");
+      canonical.setAttribute("rel", "canonical");
+      document.head.appendChild(canonical);
+    }
+    canonical.setAttribute("href", "https://nestlist-supabase.vercel.app/privacy");
+  }, []);
+
+  const handleScrollToTop = () => {
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const sections = [
+    { id: "introduction", num: 1, title: "Introduction" },
+    { id: "info-we-collect", num: 2, title: "Information We Collect" },
+    { id: "how-we-use", num: 3, title: "How We Use Your Information" },
+    { id: "info-sharing", num: 4, title: "Information Sharing" },
+    { id: "mpesa-payments", num: 5, title: "M-Pesa and Payment Data" },
+    { id: "storage-security", num: 6, title: "Data Storage and Security" },
+    { id: "your-rights", num: 7, title: "Your Rights" },
+    { id: "cookies-tracking", num: 8, title: "Cookies and Tracking" },
+    { id: "childrens-privacy", num: 9, title: "Children's Privacy" },
+    { id: "policy-changes", num: 10, title: "Changes to This Policy" },
+    { id: "contact-us", num: 11, title: "Contact Us" },
+  ];
+
   return (
-    <div className="min-h-screen bg-stone-50 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-4xl mx-auto">
-        {/* Back Link and Header */}
-        <div className="mb-8">
-          <Link
-            to="/"
-            className="inline-flex items-center space-x-2 text-sm font-semibold text-amber-700 hover:text-amber-800 transition"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            <span>Back to Browse</span>
-          </Link>
-        </div>
-
-        {/* Hero Section */}
-        <div className="bg-white rounded-3xl border border-stone-200 shadow-sm p-8 sm:p-12 mb-8 relative overflow-hidden">
-          <div className="absolute top-0 right-0 h-40 w-40 bg-amber-50 rounded-bl-full -z-10 opacity-60" />
-          <div className="flex items-center space-x-3 mb-4">
-            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-100 text-amber-700 shadow-sm">
-              <Shield className="h-6 w-6" />
-            </div>
-            <span className="text-xs font-bold text-amber-600 uppercase tracking-widest">
-              Trust & Transparency
-            </span>
+    <div className="min-h-screen bg-white font-sans text-stone-700 antialiased selection:bg-emerald-100 selection:text-emerald-900">
+      {/* Dark Green Gradient Top Banner */}
+      <div 
+        className="relative overflow-hidden py-16 px-4 sm:px-6 lg:px-8 text-center text-white"
+        style={{ background: "linear-gradient(135deg, #0A4D2E, #1E6B4A)" }}
+      >
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_30%,rgba(255,255,255,0.08),transparent_50%)] pointer-events-none" />
+        <div className="max-w-4xl mx-auto flex flex-col items-center">
+          <div className="mb-4 inline-flex items-center justify-center w-16 h-16 rounded-full bg-white/10 backdrop-blur-md shadow-inner">
+            <span className="text-3xl" role="img" aria-label="shield">🔒</span>
           </div>
-
-          <h1 className="text-3xl sm:text-4xl font-sans font-black tracking-tight text-stone-950 mb-4">
-            Nestlist Privacy Policy
+          <h1 className="font-serif text-3xl sm:text-4xl md:text-5xl font-normal tracking-tight text-white mb-3">
+            Privacy Policy
           </h1>
-
-          <div className="flex flex-wrap gap-4 text-xs font-mono text-stone-500">
-            <div className="flex items-center space-x-1">
-              <Clock className="h-3.5 w-3.5" />
-              <span>Effective Date: July 1, 2026</span>
-            </div>
-            <div className="flex items-center space-x-1">
-              <FileText className="h-3.5 w-3.5" />
-              <span>Last Updated: July 1, 2026</span>
-            </div>
-          </div>
-
-          <p className="mt-6 text-stone-600 leading-relaxed text-sm sm:text-base">
-            Nestlist ("<strong>Nestlist</strong>," "<strong>we</strong>," "<strong>us</strong>," or "<strong>our</strong>") is committed to protecting the privacy and personal data of everyone who uses our platform. This Privacy Policy explains how we collect, use, disclose, store, and protect information when you access or use the Nestlist website, mobile applications (Android and iOS), admin dashboard, vendor dashboard, landlord dashboard, agent tools, and any related services (collectively, the "<strong>Platform</strong>" or "<strong>Services</strong>").
+          <p className="text-emerald-100 font-medium text-lg sm:text-xl max-w-xl">
+            Nestlist Rental Platforms Limited
           </p>
-          <p className="mt-3 text-stone-600 leading-relaxed text-sm sm:text-base">
-            This Privacy Policy is designed to comply with the <strong>Kenya Data Protection Act, 2019</strong> and the <strong>Kenya Data Protection (General) Regulations, 2021</strong>, the <strong>EU General Data Protection Regulation ("GDPR")</strong>, the <strong>UK GDPR</strong>, the <strong>California Consumer Privacy Act / California Privacy Rights Act ("CCPA/CPRA")</strong> (where applicable), and the developer policies of <strong>Google Play</strong> and the <strong>Apple App Store</strong>.
-          </p>
-          <p className="mt-3 text-stone-600 leading-relaxed text-sm sm:text-base">
-            By creating an account, accessing, or using Nestlist, you acknowledge that you have read, understood, and agree to the practices described in this Privacy Policy. If you do not agree with this Privacy Policy, you must not use the Platform.
-          </p>
-        </div>
-
-        {/* Quick Nav / Table of Contents */}
-        <div className="bg-stone-100 rounded-2xl border border-stone-200/60 p-6 mb-8">
-          <h2 className="text-sm font-bold text-stone-800 uppercase tracking-wider mb-4 flex items-center space-x-2">
-            <CheckCircle2 className="h-4 w-4 text-amber-600" />
-            <span>Table of Contents</span>
-          </h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2 text-xs">
-            <a href="#1-definitions" className="text-stone-600 hover:text-amber-700 transition font-medium">1. Definitions</a>
-            <a href="#2-scope-and-application" className="text-stone-600 hover:text-amber-700 transition font-medium">2. Scope and Application</a>
-            <a href="#3-who-we-are" className="text-stone-600 hover:text-amber-700 transition font-medium">3. Who We Are: Data Controller Information</a>
-            <a href="#4-information-we-collect" className="text-stone-600 hover:text-amber-700 transition font-medium">4. Information We Collect</a>
-            <a href="#5-how-we-collect" className="text-stone-600 hover:text-amber-700 transition font-medium">5. How We Collect Information</a>
-            <a href="#6-why-we-collect" className="text-stone-600 hover:text-amber-700 transition font-medium">6. Why We Collect and How We Use Your Information</a>
-            <a href="#7-legal-basis" className="text-stone-600 hover:text-amber-700 transition font-medium">7. Legal Basis for Processing</a>
-            <a href="#8-ai-processing" className="text-stone-600 hover:text-amber-700 transition font-medium">8. AI Processing and Automated Decision-Making</a>
-            <a href="#9-property-verification" className="text-stone-600 hover:text-amber-700 transition font-medium">9. Property Verification, KYC, and Identity Checks</a>
-            <a href="#10-payments-financial" className="text-stone-600 hover:text-amber-700 transition font-medium">10. Payments and Financial Information</a>
-            <a href="#11-sharing-disclosure" className="text-stone-600 hover:text-amber-700 transition font-medium">11. Sharing and Disclosure of Information</a>
-            <a href="#12-third-party" className="text-stone-600 hover:text-amber-700 transition font-medium">12. Third-Party Integrations</a>
-            <a href="#13-cookies-tracking" className="text-stone-600 hover:text-amber-700 transition font-medium">13. Cookies, Tracking Technologies, and Analytics</a>
-            <a href="#14-notifications" className="text-stone-600 hover:text-amber-700 transition font-medium">14. Push, SMS, and Email Notifications</a>
-            <a href="#15-data-security" className="text-stone-600 hover:text-amber-700 transition font-medium">15. Data Security</a>
-            <a href="#16-fraud-prevention" className="text-stone-600 hover:text-amber-700 transition font-medium">16. Fraud Prevention and Security Monitoring</a>
-            <a href="#17-data-retention" className="text-stone-600 hover:text-amber-700 transition font-medium">17. Data Retention</a>
-            <a href="#18-international-transfers" className="text-stone-600 hover:text-amber-700 transition font-medium">18. International Data Transfers</a>
-            <a href="#19-privacy-rights" className="text-stone-600 hover:text-amber-700 transition font-medium">19. Your Privacy Rights</a>
-            <a href="#20-account-deletion" className="text-stone-600 hover:text-amber-700 transition font-medium">20. Account and Data Deletion</a>
-            <a href="#21-childrens-privacy" className="text-stone-600 hover:text-amber-700 transition font-medium">21. Children's Privacy</a>
-            <a href="#22-reviews-ratings" className="text-stone-600 hover:text-amber-700 transition font-medium">22. Reviews, Ratings, and Content</a>
-            <a href="#23-referral-program" className="text-stone-600 hover:text-amber-700 transition font-medium">23. Referral Program and Loyalty Points</a>
-            <a href="#24-mobile-app" className="text-stone-600 hover:text-amber-700 transition font-medium">24. Mobile App-Specific Disclosures</a>
-            <a href="#25-complaints" className="text-stone-600 hover:text-amber-700 transition font-medium">25. Complaints Procedure</a>
-            <a href="#26-changes-policy" className="text-stone-600 hover:text-amber-700 transition font-medium">26. Changes to This Privacy Policy</a>
-            <a href="#27-liability-disclaimers" className="text-stone-600 hover:text-amber-700 transition font-medium">27. Limitation of Liability and Disclaimers</a>
-            <a href="#28-contact-info" className="text-stone-600 hover:text-amber-700 transition font-medium">28. Contact Information</a>
-            <a href="#29-acknowledgment" className="text-stone-600 hover:text-amber-700 transition font-medium">29. Acknowledgment and Consent</a>
+          <div className="mt-4 flex flex-wrap justify-center items-center gap-x-4 gap-y-2 text-xs sm:text-sm text-emerald-100/80 font-mono">
+            <span>Effective: July 5, 2026</span>
+            <span className="hidden sm:inline text-emerald-100/40">•</span>
+            <span>Last Updated: July 5, 2026</span>
           </div>
         </div>
+      </div>
 
-        {/* Policy Content Sections */}
-        <div className="bg-white rounded-3xl border border-stone-200 shadow-sm p-8 sm:p-12 space-y-10 text-stone-700 text-sm sm:text-base leading-relaxed">
+      {/* Main Body Grid */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+        <div className="lg:grid lg:grid-cols-12 lg:gap-10">
           
-          {/* Section 1 */}
-          <section id="1-definitions" className="scroll-mt-20">
-            <h2 className="text-xl font-bold text-stone-900 border-b border-stone-100 pb-2 mb-4">
-              1. Definitions
-            </h2>
-            <p className="mb-3">For the purposes of this Privacy Policy, the following definitions apply:</p>
-            <ul className="list-disc pl-5 space-y-2 text-stone-600">
-              <li><strong>"Data Subject"</strong> means an identified or identifiable natural person to whom Personal Data relates, including Tenants, Landlords, Agents, Property Managers, and website visitors.</li>
-              <li><strong>"Personal Data"</strong> means any information relating to an identified or identifiable natural person, consistent with the definition under Section 2 of the Kenya Data Protection Act, 2019 and Article 4(1) of the GDPR.</li>
-              <li><strong>"Sensitive Personal Data"</strong> means data revealing an individual's race, health status, ethnic social origin, conscience, belief, genetic data, biometric data, property details, marital status, family details including names of children, parents, spouse(s), sexual orientation, financial details, or an individual's identification number, as defined under the Kenya Data Protection Act, 2019.</li>
-              <li><strong>"Processing"</strong> means any operation performed on Personal Data, including collection, recording, organization, storage, adaptation, retrieval, use, disclosure, dissemination, or destruction.</li>
-              <li><strong>"Data Controller"</strong> means Nestlist, which determines the purposes and means of Processing Personal Data.</li>
-              <li><strong>"Data Processor"</strong> means any third party that processes Personal Data on behalf of Nestlist.</li>
-              <li><strong>"User"</strong> means any person who accesses or uses the Platform, including Tenants, Landlords, Property Managers, and Agents.</li>
-              <li><strong>"Tenant"</strong> means a User seeking to search, view, apply for, or rent a property listed on the Platform.</li>
-              <li><strong>"Landlord"</strong> means a User who owns and lists property for rent or sale on the Platform.</li>
-              <li><strong>"Agent"</strong> or <strong>"Property Manager"</strong> means a User authorized to list, manage, or market properties on behalf of a Landlord.</li>
-              <li><strong>"Listing"</strong> means a property advertisement published on the Platform.</li>
-              <li><strong>"KYC"</strong> means "Know Your Customer," referring to identity verification processes.</li>
-              <li><strong>"Cookies"</strong> means small data files placed on a User's device, as further described in Section 13.</li>
-            </ul>
-          </section>
-
-          {/* Section 2 */}
-          <section id="2-scope-and-application" className="scroll-mt-20">
-            <h2 className="text-xl font-bold text-stone-900 border-b border-stone-100 pb-2 mb-4">
-              2. Scope and Application
-            </h2>
-            <p className="mb-3">This Privacy Policy applies to all Personal Data processed by Nestlist in connection with:</p>
-            <ol className="list-decimal pl-5 space-y-1.5 text-stone-600">
-              <li>The Nestlist website and any subdomains;</li>
-              <li>The Nestlist mobile applications available on the Google Play Store and Apple App Store;</li>
-              <li>The Nestlist Admin Dashboard, Vendor Dashboard, Landlord Dashboard, and Agent tools;</li>
-              <li>Any customer support interactions, whether by email, phone, live chat, or WhatsApp;</li>
-              <li>Any offline interactions connected to the Services, such as property verification visits.</li>
-            </ol>
-            <p className="mt-3">
-              This Privacy Policy does <strong>not</strong> apply to third-party websites, applications, or services that may be linked to or integrated with the Platform, including but not limited to Google Maps, WhatsApp, and payment processors. We encourage Users to review the privacy policies of such third parties independently.
-            </p>
-          </section>
-
-          {/* Section 3 */}
-          <section id="3-who-we-are" className="scroll-mt-20">
-            <h2 className="text-xl font-bold text-stone-900 border-b border-stone-100 pb-2 mb-4">
-              3. Who We Are: Data Controller Information
-            </h2>
-            <p className="mb-3">
-              Nestlist acts as the Data Controller in respect of Personal Data collected through the Platform for account management, listings, communications, and platform operations. Where Landlords, Agents, or Property Managers collect information about Tenants independently (for example, during in-person viewings), they may act as independent Data Controllers in their own right and are responsible for complying with applicable data protection laws in respect of such collection.
-            </p>
-            <div className="bg-stone-50 border border-stone-200 rounded-xl p-5 text-xs sm:text-sm text-stone-600 space-y-1.5 font-mono">
-              <p><strong>Data Controller:</strong> Nestlist Platforms Limited</p>
-              <p><strong>Registered Address:</strong> Nairobi, Kenya</p>
-              <p><strong>Data Protection Officer Email:</strong> privacy@nestlist.co.ke</p>
-              <p><strong>Registration status:</strong> Registered with the Office of the Data Protection Commissioner (ODPC), Kenya, in accordance with Section 18 of the Kenya Data Protection Act, 2019.</p>
+          {/* Table of Contents - Sticky Left Column */}
+          <aside className="hidden lg:block lg:col-span-4">
+            <div className="sticky top-24 bg-stone-50 rounded-2xl border border-stone-200/80 p-6 shadow-sm">
+              <h3 className="font-serif text-lg text-stone-900 mb-4 pb-2 border-b border-stone-200 flex items-center gap-2">
+                <CheckCircle2 className="h-5 w-5 text-emerald-700" />
+                <span>Table of Contents</span>
+              </h3>
+              <nav className="space-y-1.5">
+                {sections.map((sec) => (
+                  <a
+                    key={sec.id}
+                    href={`#${sec.id}`}
+                    className="group flex items-start gap-2.5 py-1 text-[13px] text-stone-600 hover:text-emerald-800 transition font-medium"
+                  >
+                    <span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-emerald-600 group-hover:scale-125 transition shrink-0" />
+                    <span>{sec.num}. {sec.title}</span>
+                  </a>
+                ))}
+              </nav>
+              <button
+                onClick={handleScrollToTop}
+                className="mt-6 w-full flex items-center justify-center gap-2 py-2 px-4 border border-stone-200 hover:border-emerald-700 bg-white hover:bg-emerald-50 text-xs font-semibold text-stone-600 hover:text-emerald-800 rounded-lg shadow-xs transition"
+              >
+                <ArrowUp className="h-3.5 w-3.5" />
+                <span>Back to top</span>
+              </button>
             </div>
-          </section>
+          </aside>
 
-          {/* Section 4 */}
-          <section id="4-information-we-collect" className="scroll-mt-20">
-            <h2 className="text-xl font-bold text-stone-900 border-b border-stone-100 pb-2 mb-4">
-              4. Information We Collect
-            </h2>
-            <p className="mb-3">We collect several categories of information depending on how you interact with the Platform and the role you hold.</p>
+          {/* Table of Contents - Mobile Quick Selector */}
+          <div className="lg:hidden mb-10 bg-stone-50 rounded-xl border border-stone-200 p-5">
+            <h3 className="font-serif text-base text-stone-900 mb-3 flex items-center gap-2">
+              <CheckCircle2 className="h-4 w-4 text-emerald-700" />
+              <span>Quick Navigation</span>
+            </h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1.5 text-xs">
+              {sections.map((sec) => (
+                <a
+                  key={sec.id}
+                  href={`#${sec.id}`}
+                  className="flex items-center gap-2 py-1 text-stone-600 hover:text-emerald-800 font-medium"
+                >
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 shrink-0" />
+                  <span>{sec.num}. {sec.title}</span>
+                </a>
+              ))}
+            </div>
+          </div>
+
+          {/* Policy Document Details - Right Column */}
+          <main className="lg:col-span-8 max-w-[800px] mx-auto text-stone-700 leading-relaxed text-sm sm:text-[15px] space-y-12">
             
-            <div className="space-y-4">
-              <div>
-                <h3 className="font-bold text-stone-850 text-sm uppercase tracking-wider mb-1">4.1 Identity and Contact Information</h3>
-                <p className="text-stone-650">Full name, email address, phone number, password (stored in encrypted/hashed form), profile photograph, date of birth (where required for verification), physical or postal address.</p>
-              </div>
-              <div>
-                <h3 className="font-bold text-stone-850 text-sm uppercase tracking-wider mb-1">4.2 Government Identification and KYC Information</h3>
-                <p className="text-stone-650">National ID number, passport number, or alien ID number, KRA PIN (where applicable), business registration and licensing documents, selfie or liveness-check images, proof of property ownership (e.g., title deeds, lease agreements, letters of authority).</p>
-              </div>
-              <div>
-                <h3 className="font-bold text-stone-850 text-sm uppercase tracking-wider mb-1">4.3 Business and Professional Information</h3>
-                <p className="text-stone-650">Business name, registration number, and address; agency license or professional accreditation details; bank account or mobile money details for receiving payments (Agents, Landlords, and Property Managers).</p>
-              </div>
-              <div>
-                <h3 className="font-bold text-stone-850 text-sm uppercase tracking-wider mb-1">4.4 Property Information</h3>
-                <p className="text-stone-650">Property address and GPS coordinates, property type, size, amenities, and pricing, photographs, videos, and virtual tour content, verification status and history.</p>
-              </div>
-              <div>
-                <h3 className="font-bold text-stone-850 text-sm uppercase tracking-wider mb-1">4.5 Rental Application and Transaction Information</h3>
-                <p className="text-stone-650">Rental application details (including employment and income information voluntarily submitted by Tenants), references, booking and visit scheduling information, subscription and featured listing payment history.</p>
-              </div>
-              <div>
-                <h3 className="font-bold text-stone-850 text-sm uppercase tracking-wider mb-1">4.6 Payment Information</h3>
-                <p className="text-stone-650">M-Pesa transaction details (phone number, transaction ID, amount), Airtel Money transaction details, card details (processed exclusively through PCI-DSS-compliant third-party payment processors; Nestlist does not store full card numbers), bank transfer details.</p>
-              </div>
-              <div>
-                <h3 className="font-bold text-stone-850 text-sm uppercase tracking-wider mb-1">4.7 Communications Data</h3>
-                <p className="text-stone-650">Messages exchanged between Tenants, Landlords, and Agents through in-platform messaging; live chat transcripts; WhatsApp messages sent through our WhatsApp Business integration; customer support correspondence.</p>
-              </div>
-              <div>
-                <h3 className="font-bold text-stone-850 text-sm uppercase tracking-wider mb-1">4.8 Technical and Device Information</h3>
-                <p className="text-stone-650">IP address, device type, model, operating system, browser type and version, device identifiers (e.g., Advertising ID, IDFA, GAID), app version, and GPS or approximate location data (where permission is granted).</p>
-              </div>
-              <div>
-                <h3 className="font-bold text-stone-850 text-sm uppercase tracking-wider mb-1">4.9 Usage and Analytics Information</h3>
-                <p className="text-stone-650">Search history, search filters, saved searches, saved/favorited properties, pages visited, features used, time spent on the Platform, and referral source.</p>
-              </div>
-              <div>
-                <h3 className="font-bold text-stone-850 text-sm uppercase tracking-wider mb-1">4.10 User-Generated Content</h3>
-                <p className="text-stone-650">Reviews and ratings of properties, Landlords, or Agents; reported issues, complaints, and fraud reports.</p>
-              </div>
-              <div>
-                <h3 className="font-bold text-stone-850 text-sm uppercase tracking-wider mb-1">4.11 Marketing Preferences</h3>
-                <p className="text-stone-650">Communication and marketing opt-in/opt-out preferences; language and notification preferences.</p>
+            {/* Highlight: Kenya Data Protection Act Compliance */}
+            <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-5 text-stone-900 shadow-xs">
+              <div className="flex items-start gap-3">
+                <div className="p-1 bg-emerald-100 text-emerald-800 rounded-lg shrink-0 mt-0.5">
+                  <Shield className="h-5 w-5" />
+                </div>
+                <div>
+                  <h4 className="font-bold text-stone-950 text-sm tracking-tight mb-1">
+                    Kenya Data Protection Act, 2019 Notice
+                  </h4>
+                  <p className="text-xs sm:text-sm text-stone-800 leading-relaxed">
+                    This Privacy Policy is designed to comply with <strong>Kenya's Data Protection Act 2019</strong>. We respect your rights as a data subject and guarantee full transparency in how we verify, process, and protect your listings, payments, and rental inquiries on NestList.
+                  </p>
+                </div>
               </div>
             </div>
-            <p className="mt-4 text-xs text-stone-500 italic">
-              We aim to collect only the information that is reasonably necessary to provide and improve our Services, consistent with the data minimization principle under Section 25 of the Kenya Data Protection Act, 2019 and Article 5(1)(c) GDPR.
-            </p>
-          </section>
 
-          {/* Section 5 */}
-          <section id="5-how-we-collect" className="scroll-mt-20">
-            <h2 className="text-xl font-bold text-stone-900 border-b border-stone-100 pb-2 mb-4">
-              5. How We Collect Information
-            </h2>
-            <p className="mb-3">We collect information in the following ways:</p>
-            <ul className="list-disc pl-5 space-y-2 text-stone-650">
-              <li><strong>Directly from you</strong> — when you register an account, complete your profile, list a property, submit a rental application, upload documents, make a payment, contact support, or otherwise interact with the Platform.</li>
-              <li><strong>Automatically</strong> — through cookies, SDKs, and similar tracking technologies when you use our website or mobile apps, including device information, IP address, location data, and usage analytics.</li>
-              <li><strong>From third parties</strong> — including identity verification providers, payment processors (Safaricom M-Pesa, Airtel Money, card processors, banks), Google (for Maps and sign-in), and publicly available registries.</li>
-              <li><strong>From other Users</strong> — for example, when a Landlord or Agent uploads information about a property or when a reference is submitted in connection with a rental application.</li>
-            </ul>
-          </section>
+            {/* SECTION 1 - INTRODUCTION */}
+            <section id="introduction" className="scroll-mt-20">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="flex items-center justify-center w-8 h-8 rounded-full bg-emerald-700 text-white font-mono text-sm font-bold shrink-0">
+                  1
+                </div>
+                <h2 className="font-serif text-xl sm:text-2xl text-stone-900 font-normal">
+                  Introduction
+                </h2>
+              </div>
+              <div className="pl-5 border-l-4 border-emerald-700 space-y-4">
+                <p>
+                  Karibu to NestList! NestList is Kenya's trusted digital property listing platform, operated by <strong>Nestlist Rental Platforms Limited</strong> (Business Registration: <strong>BN-P7SEPZD3</strong>). We connect landlords, property agents, caretakers, and property seekers (tenants) across Nairobi, Kiambu, Machakos, Nakuru, Kisumu, Mombasa, and beyond.
+                </p>
+                <p>
+                  Your privacy is incredibly important to us. This policy outlines exactly how we collect, handle, verify, store, and protect your personal information on our website (<a href="https://nestlist-supabase.vercel.app" target="_blank" rel="noopener noreferrer" className="text-emerald-700 underline hover:text-emerald-800">https://nestlist-supabase.vercel.app</a>) and all related services. We have written this in straightforward, plain English so that landlords and tenants can understand exactly what happens to their information.
+                </p>
+                <p>
+                  Under the <strong>Kenya Data Protection Act 2019</strong>, <strong>Nestlist Rental Platforms Limited</strong> acts as the Data Controller. We are fully committed to keeping your information safe and respecting your rights throughout your property journey.
+                </p>
+              </div>
+            </section>
 
-          {/* Section 6 */}
-          <section id="6-why-we-collect" className="scroll-mt-20">
-            <h2 className="text-xl font-bold text-stone-900 border-b border-stone-100 pb-2 mb-4">
-              6. Why We Collect and How We Use Your Information
-            </h2>
-            <p className="mb-3">We use the collected information for the following specific purposes:</p>
-            <ul className="list-disc pl-5 space-y-1.5 text-stone-650">
-              <li><strong>Account creation and management</strong> — to register, authenticate, and manage User accounts across Tenant, Landlord, Agent, and Property Manager roles.</li>
-              <li><strong>Listing and search functionality</strong> — to publish, display, and enable search and discovery of property listings, including AI-powered and map-based search.</li>
-              <li><strong>Communication facilitation</strong> — to enable messaging, live chat, and notifications between Users, and between Users and Nestlist.</li>
-              <li><strong>Property verification</strong> — to confirm the authenticity of listings and the identity/authority of Landlords and Agents.</li>
-              <li><strong>Payment processing</strong> — to process subscription fees, featured listing fees, and other payments via M-Pesa, Airtel Money, card, or bank transfer, and to maintain transaction records.</li>
-              <li><strong>Rental applications and bookings</strong> — to facilitate applications for rental properties and scheduling of property visits.</li>
-              <li><strong>Personalization</strong> — to power AI-driven property recommendations, personalized search results, and saved search alerts.</li>
-              <li><strong>Customer support</strong> — to respond to inquiries, resolve disputes, and provide technical assistance.</li>
-              <li><strong>Fraud prevention and security</strong> — to detect, investigate, and prevent fraudulent listings, fake accounts, scams, and unauthorized access.</li>
-              <li><strong>Analytics and platform improvement</strong> — to understand usage patterns, diagnose technical issues, and improve features and performance.</li>
-              <li><strong>Marketing communications</strong> — to send promotional content, newsletters, referral program updates, and loyalty point notifications, subject to your consent and opt-out rights.</li>
-              <li><strong>Legal compliance</strong> — to comply with applicable laws, regulatory requests, tax obligations, and law enforcement requirements.</li>
-            </ul>
-          </section>
+            {/* SECTION 2 - INFORMATION WE COLLECT */}
+            <section id="info-we-collect" className="scroll-mt-20">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="flex items-center justify-center w-8 h-8 rounded-full bg-emerald-700 text-white font-mono text-sm font-bold shrink-0">
+                  2
+                </div>
+                <h2 className="font-serif text-xl sm:text-2xl text-stone-900 font-normal">
+                  Information We Collect
+                </h2>
+              </div>
+              <div className="pl-5 border-l-4 border-emerald-700 space-y-6">
+                <p>
+                  To provide our rental and property services, we need to collect different pieces of information depending on your role on the platform.
+                </p>
 
-          {/* Section 7 */}
-          <section id="7-legal-basis" className="scroll-mt-20">
-            <h2 className="text-xl font-bold text-stone-900 border-b border-stone-100 pb-2 mb-4">
-              7. Legal Basis for Processing
-            </h2>
-            <p className="mb-3">We rely on the following legal bases to process Personal Data:</p>
-            <ul className="list-disc pl-5 space-y-2 text-stone-650">
-              <li><strong>Consent</strong> — for optional features such as marketing communications, push notifications, precise location tracking, and certain cookies. You may withdraw consent at any time.</li>
-              <li><strong>Performance of a contract</strong> — where processing is necessary to provide the Services you have requested, such as creating an account, publishing a listing, or processing a payment.</li>
-              <li><strong>Legal obligation</strong> — where processing is required to comply with Kenyan tax law, anti-money laundering requirements, or other statutory obligations.</li>
-              <li><strong>Legitimate interests</strong> — where processing is necessary for purposes such as fraud prevention, platform security, service improvement, and direct marketing to existing Users.</li>
-            </ul>
-          </section>
+                <div>
+                  <h3 className="font-serif text-lg text-stone-900 mb-2">2.1 Information You Give Us Directly</h3>
+                  <ul className="space-y-4">
+                    <li className="bg-stone-50 p-4 rounded-xl border border-stone-100">
+                      <strong className="text-stone-950 block mb-1">Account Registration:</strong>
+                      <div className="text-sm space-y-1.5 text-stone-700">
+                        <p>• <strong>Full Name:</strong> To personalize your account and represent your identity to landlords or tenants.</p>
+                        <p>• <strong>Email Address:</strong> Used for secure login, critical alerts, and platform notifications.</p>
+                        <p>• <strong>Phone Number (+254 format):</strong> Crucial for SMS alerts, manual payment receipts, and landlord-tenant communication.</p>
+                        <p>• <strong>Password:</strong> Hashed securely, meaning it is mathematically scrambled and completely unreadable by NestList employees or third parties.</p>
+                        <p>• <strong>Role Selection:</strong> Whether you register as a Landlord, Caretaker, Agent, or Tenant, which helps us customize the menus, features, and dashboards you see.</p>
+                      </div>
+                    </li>
 
-          {/* Section 8 */}
-          <section id="8-ai-processing" className="scroll-mt-20">
-            <h2 className="text-xl font-bold text-stone-900 border-b border-stone-100 pb-2 mb-4">
-              8. Artificial Intelligence Processing and Automated Decision-Making
-            </h2>
-            <p className="mb-3">
-              8.1. Nestlist uses artificial intelligence and machine learning technologies to power certain features, including:
-            </p>
-            <ul className="list-disc pl-5 space-y-1 mb-3 text-stone-650">
-              <li>AI-powered property recommendations based on your search history, saved properties, and stated preferences;</li>
-              <li>AI-assisted search that interprets natural-language queries;</li>
-              <li>Fraud and duplicate-listing detection systems;</li>
-              <li>Automated flagging of potentially fraudulent user reports or suspicious account activity.</li>
-            </ul>
-            <p className="mb-3">
-              8.2. <strong>Nature of automated processing.</strong> These systems analyze patterns in your usage data (such as search filters, favorited properties, and location preferences) to generate personalized suggestions. Recommendation outputs are advisory in nature and do not produce legal or similarly significant effects on you without the opportunity for human review.
-            </p>
-            <p className="mb-3">
-              8.3. <strong>Fraud detection systems</strong> may generate automated risk scores that flag accounts or listings for further human review. Any decision to suspend, restrict, or remove an account or listing based on such flags is subject to review by Nestlist's Trust & Safety team. Affected Users may contact us to request human review of such a decision.
-            </p>
-            <p className="mb-3">
-              8.4. <strong>Opting out.</strong> Where AI-powered recommendations are based on optional profiling, you may adjust your preferences in your account settings or contact us to request that such profiling be limited.
-            </p>
-            <p>
-              8.5. We do not use AI systems to make solely automated decisions that produce legal effects concerning tenancy approval; rental application decisions remain the responsibility of the relevant Landlord or Agent.
-            </p>
-          </section>
+                    <li className="bg-stone-50 p-4 rounded-xl border border-stone-100">
+                      <strong className="text-stone-950 block mb-1">Property Listings (Landlords and Agents):</strong>
+                      <div className="text-sm space-y-1.5 text-stone-700">
+                        <p>• Property title, detailed description, and price in Kenyan Shillings (KES).</p>
+                        <p>• Geographical location, including county, constituency, estate, or area name.</p>
+                        <p>• Property category (e.g. bedsitter, single room, bedsitter, studio, 1-bedroom, executive homes).</p>
+                        <p>• Available amenities (e.g. Borehole water, 24/7 security, WiFi, parking, balconies).</p>
+                        <p>• Property photos uploaded by you, stored securely on our cloud storage buckets.</p>
+                      </div>
+                    </li>
 
-          {/* Section 9 */}
-          <section id="9-property-verification" className="scroll-mt-20">
-            <h2 className="text-xl font-bold text-stone-900 border-b border-stone-100 pb-2 mb-4">
-              9. Property Verification, KYC, and Identity Checks
-            </h2>
-            <p className="mb-3">
-              9.1. To promote trust and safety, Nestlist operates a property and identity verification program. Landlords and Agents may be required to submit government identification, proof of property ownership or management authority, and business registration documents.
-            </p>
-            <p className="mb-3">
-              9.2. Verification information is processed by our internal Trust & Safety team and, where applicable, by third-party identity verification providers acting as Data Processors under contractual data protection obligations.
-            </p>
-            <p className="mb-3">
-              9.3. Verification badges displayed on listings indicate that certain checks have been completed but do not constitute a guarantee or warranty by Nestlist as to the accuracy of the information provided, the legal title of the property, or the trustworthiness of the Landlord or Agent.
-            </p>
-            <p>
-              9.4. Identification documents are stored securely, encrypted at rest, and accessible only to authorized personnel and our verification service providers.
-            </p>
-          </section>
+                    <li className="bg-stone-50 p-4 rounded-xl border border-stone-100">
+                      <strong className="text-stone-950 block mb-1">Payment Information:</strong>
+                      <div className="text-sm space-y-1.5 text-stone-700">
+                        <p>• M-Pesa receipt verification code (e.g. QBG582Y78X).</p>
+                        <p>• Mobile number used to perform the transaction.</p>
+                        <p>• Amount paid in KES for the listing activation fee.</p>
+                        <p className="mt-2 text-xs text-amber-700 font-medium bg-amber-50 p-2 rounded-lg border border-amber-100">
+                          ⚠️ NOTE: We do NOT store your M-Pesa PIN, nor do we have any access to your private M-Pesa balance. We only check the specific receipt code you share with us.
+                        </p>
+                      </div>
+                    </li>
 
-          {/* Section 10 */}
-          <section id="10-payments-financial" className="scroll-mt-20">
-            <h2 className="text-xl font-bold text-stone-900 border-b border-stone-100 pb-2 mb-4">
-              10. Payments and Financial Information
-            </h2>
-            <p className="mb-3">
-              10.1. Nestlist supports payments via <strong>M-Pesa</strong>, <strong>Airtel Money</strong>, <strong>card payments</strong>, and <strong>bank transfers</strong>, processed through licensed and regulated third-party payment service providers.
-            </p>
-            <p className="mb-3">
-              10.2. We do <strong>not</strong> store full card numbers, CVV codes, or M-Pesa/Airtel Money PINs. Card transactions are processed through PCI-DSS-compliant payment gateways, and mobile money transactions are processed through the respective telecommunications operators' secure APIs.
-            </p>
-            <p className="mb-3">
-              10.3. We retain transaction metadata (such as transaction ID, amount, date, and payment status) for accounting, tax, dispute resolution, and fraud-prevention purposes, consistent with applicable financial recordkeeping laws in Kenya.
-            </p>
-            <p>
-              10.4. Nestlist is not a party to, and assumes no liability for, rental payments, deposits, or other financial arrangements made directly between Tenants and Landlords outside of designated in-platform payment features.
-            </p>
-          </section>
+                    <li className="bg-stone-50 p-4 rounded-xl border border-stone-100">
+                      <strong className="text-stone-950 block mb-1">Inquiry Information:</strong>
+                      <div className="text-sm space-y-1.5 text-stone-700">
+                        <p>• Your name, email address, and phone number when you fill out an inquiry form to contact a landlord.</p>
+                        <p>• The typed text of your message expressing interest in a property listing.</p>
+                      </div>
+                    </li>
+                  </ul>
+                </div>
 
-          {/* Section 11 */}
-          <section id="11-sharing-disclosure" className="scroll-mt-20">
-            <h2 className="text-xl font-bold text-stone-900 border-b border-stone-100 pb-2 mb-4">
-              11. Sharing and Disclosure of Information
-            </h2>
-            <p className="mb-3">We do not sell your Personal Data. We may share information in the following circumstances:</p>
-            <ul className="list-disc pl-5 space-y-1.5 text-stone-650">
-              <li><strong>Between Users, as necessary to facilitate transactions:</strong> A Tenant's application details may be shared with the relevant Landlord or Agent, and a Landlord's contact and listing information may be visible to Tenants who inquire about a property.</li>
-              <li><strong>With service providers and processors:</strong> Including cloud hosting providers, payment processors, SMS and email delivery providers, identity verification vendors, and analytics providers.</li>
-              <li><strong>With professional advisors:</strong> Such as legal counsel, auditors, and insurers, where necessary for our legitimate business operations.</li>
-              <li><strong>With regulators and law enforcement:</strong> Where required by Kenyan law, court order, or to comply with legal process, or to protect the rights, property, or safety of Nestlist, our Users, or the public.</li>
-              <li><strong>In connection with a corporate transaction:</strong> Such as a merger, acquisition, financing, or sale of assets, subject to appropriate confidentiality safeguards.</li>
-              <li><strong>With your consent:</strong> For any other purpose disclosed to you at the time of collection.</li>
-            </ul>
-          </section>
+                <div>
+                  <h3 className="font-serif text-lg text-stone-900 mb-2">2.2 Information Collected Automatically</h3>
+                  <p>
+                    When you use NestList, we collect basic technical data automatically. This includes:
+                  </p>
+                  <ul className="list-disc pl-5 mt-2 space-y-1 text-sm text-stone-600">
+                    <li>The type of web browser and device (Android, iPhone, tablet, or desktop) you use.</li>
+                    <li>Your IP address and approximate location.</li>
+                    <li>The specific pages you visit on NestList and the date and time of your interactions.</li>
+                    <li>The referring link or search engine that directed you to our website.</li>
+                  </ul>
+                </div>
 
-          {/* Section 12 */}
-          <section id="12-third-party" className="scroll-mt-20">
-            <h2 className="text-xl font-bold text-stone-900 border-b border-stone-100 pb-2 mb-4">
-              12. Third-Party Integrations
-            </h2>
-            <p className="mb-3">The Platform integrates with third-party services which may independently process your data subject to their own privacy policies:</p>
-            <ul className="list-disc pl-5 space-y-1.5 text-stone-650">
-              <li><strong>Payment Processors</strong> — Safaricom M-Pesa Daraja API, Airtel Money, bank transfer APIs.</li>
-              <li><strong>Cloud Hosting Providers</strong> — for secure database storage and backups.</li>
-              <li><strong>Google Maps Platform</strong> — for displaying property locations and enabling map-based search.</li>
-              <li><strong>WhatsApp Business Platform (Meta)</strong> — for enabling communications between Users and Nestlist.</li>
-              <li><strong>SMS & Email Gateways</strong> — Africa's Talking, Twilio, Resend, or other transactional delivery networks.</li>
-              <li><strong>Identity Verification Providers</strong> — for document verification.</li>
-            </ul>
-          </section>
+                <div>
+                  <h3 className="font-serif text-lg text-stone-900 mb-2">2.3 Information We Do NOT Collect</h3>
+                  <p>
+                    To stay compliant with the data minimization principles of Kenya's regulations, we explicitly avoid collecting:
+                  </p>
+                  <ul className="list-disc pl-5 mt-2 space-y-1 text-sm text-stone-600">
+                    <li>Your personal M-Pesa PIN or password.</li>
+                    <li>Your National Identity Card (ID) number (unless strictly required for manual KYC verification).</li>
+                    <li>Your bank account details or credit card PINs.</li>
+                    <li>Continuous location tracking when you are not using our platform.</li>
+                    <li>Access to your mobile contacts or photos outside of those you choose to upload.</li>
+                  </ul>
+                </div>
+              </div>
+            </section>
 
-          {/* Section 13 */}
-          <section id="13-cookies-tracking" className="scroll-mt-20">
-            <h2 className="text-xl font-bold text-stone-900 border-b border-stone-100 pb-2 mb-4">
-              13. Cookies, Tracking Technologies, and Analytics
-            </h2>
-            <p className="mb-3">
-              13.1. Nestlist uses cookies, SDKs, and similar tracking technologies on our website and mobile applications to enable core functionality, remember preferences, analyze usage, and support fraud detection.
-            </p>
-            <p className="mb-3">
-              13.2. <strong>Categories of cookies used:</strong>
-            </p>
-            <div className="overflow-x-auto mb-3">
-              <table className="min-w-full text-xs sm:text-sm border border-stone-200">
-                <thead>
-                  <tr className="bg-stone-100 border-b border-stone-200">
-                    <th className="px-4 py-2 text-left font-bold text-stone-700">Category</th>
-                    <th className="px-4 py-2 text-left font-bold text-stone-700">Purpose</th>
-                    <th className="px-4 py-2 text-left font-bold text-stone-700">Can be disabled?</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr className="border-b border-stone-100">
-                    <td className="px-4 py-2 font-bold text-stone-800">Strictly Necessary</td>
-                    <td className="px-4 py-2">Session management, authentication, security checks</td>
-                    <td className="px-4 py-2 text-stone-500">No</td>
-                  </tr>
-                  <tr className="border-b border-stone-100">
-                    <td className="px-4 py-2 font-bold text-stone-800">Functional</td>
-                    <td className="px-4 py-2">Remembering preferences, theme preferences, and saved searches</td>
-                    <td className="px-4 py-2 text-green-600">Yes</td>
-                  </tr>
-                  <tr className="border-b border-stone-100">
-                    <td className="px-4 py-2 font-bold text-stone-800">Analytics</td>
-                    <td className="px-4 py-2">Understanding traffic patterns, performance testing, and user journeys</td>
-                    <td className="px-4 py-2 text-green-600">Yes</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-            <p>
-              13.3. You may manage cookie preferences through your browser settings or device settings at any time. Disabling certain cookies may limit specific features.
-            </p>
-          </section>
+            {/* SECTION 3 - HOW WE USE YOUR INFORMATION */}
+            <section id="how-we-use" className="scroll-mt-20">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="flex items-center justify-center w-8 h-8 rounded-full bg-emerald-700 text-white font-mono text-sm font-bold shrink-0">
+                  3
+                </div>
+                <h2 className="font-serif text-xl sm:text-2xl text-stone-900 font-normal">
+                  How We Use Your Information
+                </h2>
+              </div>
+              <div className="pl-5 border-l-4 border-emerald-700 space-y-4">
+                <p>
+                  We process your data to keep the platform reliable, secure, and helpful. Specifically, we use it for:
+                </p>
 
-          {/* Section 14 */}
-          <section id="14-notifications" className="scroll-mt-20">
-            <h2 className="text-xl font-bold text-stone-900 border-b border-stone-100 pb-2 mb-4">
-              14. Push, SMS, and Email Notifications; Marketing Communications
-            </h2>
-            <p className="mb-3">
-              14.1. We send <strong>transactional notifications</strong> (e.g., account verification, payment confirmations, application status updates, security alerts) via push notification, SMS, and email. These cannot be opted out of while maintaining an active account.
-            </p>
-            <p className="mb-3">
-              14.2. We send <strong>marketing communications</strong> (e.g., promotions, new feature announcements, referral program updates) via push, SMS, email, and WhatsApp only where you have opted in.
-            </p>
-            <p>
-              14.3. You may opt out of marketing communications at any time by using the "unsubscribe" link in emails, adjusting notification settings within the app, replying "STOP" to SMS, or contacting us.
-            </p>
-          </section>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="p-4 bg-stone-50 rounded-lg border border-stone-200/50">
+                    <h4 className="font-bold text-stone-950 text-sm mb-1">Account Management</h4>
+                    <p className="text-xs text-stone-600">
+                      Creating and maintaining your NestList account, securely authenticating your login credentials, and personalizing your role experience.
+                    </p>
+                  </div>
+                  <div className="p-4 bg-stone-50 rounded-lg border border-stone-200/50">
+                    <h4 className="font-bold text-stone-950 text-sm mb-1">Property Listings</h4>
+                    <p className="text-xs text-stone-600">
+                      Displaying your listed properties to tenants, tracking payment statuses, and notifying you automatically of any upcoming listing expirations.
+                    </p>
+                  </div>
+                  <div className="p-4 bg-stone-50 rounded-lg border border-stone-200/50">
+                    <h4 className="font-bold text-stone-950 text-sm mb-1">Critical SMS Alerts</h4>
+                    <p className="text-xs text-stone-600">
+                      Sending automated text alerts for active inquiry notifications, payment verifications, and listing expiry warnings (e.g. 3 days before removal).
+                    </p>
+                  </div>
+                  <div className="p-4 bg-stone-50 rounded-lg border border-stone-200/50">
+                    <h4 className="font-bold text-stone-950 text-sm mb-1">Platform Integrity</h4>
+                    <p className="text-xs text-stone-600">
+                      Checking submitted payment codes for duplicates, verifying that listings are authentic, and ensuring bad actors cannot list fraudulent apartments.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </section>
 
-          {/* Section 15 */}
-          <section id="15-data-security" className="scroll-mt-20">
-            <h2 className="text-xl font-bold text-stone-900 border-b border-stone-100 pb-2 mb-4">
-              15. Data Security
-            </h2>
-            <p className="mb-3">
-              15.1. We implement technical and organizational measures designed to protect Personal Data against unauthorized access, alteration, disclosure, or destruction, consistent with Section 41 of the Kenya Data Protection Act, 2019 and Article 32 GDPR. These include encryption of data in transit (TLS) and at rest, password hashing, and role-based access controls.
-            </p>
-            <p className="mb-3">
-              15.2. While we take reasonable and industry-standard measures to protect your data, <strong>no method of electronic transmission or storage is completely secure</strong>, and we cannot guarantee absolute security.
-            </p>
-            <p>
-              15.3. In the event of a data breach likely to result in a risk to your rights and freedoms, we will notify the Office of the Data Protection Commissioner and affected Users without undue delay, in accordance with Section 43 of the Kenya Data Protection Act, 2019.
-            </p>
-          </section>
+            {/* SECTION 4 - INFORMATION SHARING */}
+            <section id="info-sharing" className="scroll-mt-20">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="flex items-center justify-center w-8 h-8 rounded-full bg-emerald-700 text-white font-mono text-sm font-bold shrink-0">
+                  4
+                </div>
+                <h2 className="font-serif text-xl sm:text-2xl text-stone-900 font-normal">
+                  Information Sharing
+                </h2>
+              </div>
+              <div className="pl-5 border-l-4 border-emerald-700 space-y-4">
+                <p>
+                  We do not sell, rent, or trade your personal information. To deliver our services, we only share data with verified, trusted infrastructure providers:
+                </p>
 
-          {/* Section 16 */}
-          <section id="16-fraud-prevention" className="scroll-mt-20">
-            <h2 className="text-xl font-bold text-stone-900 border-b border-stone-100 pb-2 mb-4">
-              16. Fraud Prevention and Security Monitoring
-            </h2>
-            <p className="mb-3">
-              16.1. We employ automated and manual fraud detection systems to identify fake listings, fraudulent accounts, phishing attempts, and payment fraud. These systems analyze account behavior, device fingerprints, and listing patterns.
-            </p>
-            <p>
-              16.2. We encourage Users to submit reports of suspected fraudulent listings or scam attempts through the in-app reporting feature. We review reports and may suspend or terminate accounts found to be in violation of our terms.
-            </p>
-          </section>
+                <div className="space-y-3">
+                  <div className="flex items-start gap-2 text-sm">
+                    <span className="text-emerald-700 mt-0.5 font-bold">✓</span>
+                    <div>
+                      <strong>Africa's Talking (SMS API Provider):</strong> We share your registered phone number and message text solely to deliver instant alerts. Based in Nairobi, Kenya, Africa's Talking complies strictly with local data privacy laws. 
+                      <a href="https://africastalking.com/privacy" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-emerald-700 ml-1.5 hover:underline">
+                        Policy <ExternalLink className="h-3 w-3 inline" />
+                      </a>
+                    </div>
+                  </div>
 
-          {/* Section 17 */}
-          <section id="17-data-retention" className="scroll-mt-20">
-            <h2 className="text-xl font-bold text-stone-900 border-b border-stone-100 pb-2 mb-4">
-              17. Data Retention
-            </h2>
-            <p className="mb-3">
-              17.1. We retain Personal Data only for as long as necessary to fulfill the purposes described, including to satisfy legal, accounting, tax, or regulatory requirements.
-            </p>
-            <p className="mb-3">
-              17.2. <strong>Indicative retention periods:</strong>
-            </p>
-            <ul className="list-disc pl-5 space-y-1 mb-3 text-stone-650">
-              <li><strong>Account profile:</strong> Duration of account plus 24 months.</li>
-              <li><strong>KYC and IDs:</strong> 7 years from account closure, or as required by law.</li>
-              <li><strong>Transaction records:</strong> 7 years, consistent with Kenyan tax obligations.</li>
-              <li><strong>In-app communications:</strong> 24 months from last activity.</li>
-            </ul>
-          </section>
+                  <div className="flex items-start gap-2 text-sm">
+                    <span className="text-emerald-700 mt-0.5 font-bold">✓</span>
+                    <div>
+                      <strong>Supabase (Cloud Database and Auth):</strong> Our primary database and storage provider. All database backups, tenant metadata, property listings, and photos are encrypted securely.
+                      <a href="https://supabase.com/privacy" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-emerald-700 ml-1.5 hover:underline">
+                        Policy <ExternalLink className="h-3 w-3 inline" />
+                      </a>
+                    </div>
+                  </div>
 
-          {/* Section 18 */}
-          <section id="18-international-transfers" className="scroll-mt-20">
-            <h2 className="text-xl font-bold text-stone-900 border-b border-stone-100 pb-2 mb-4">
-              18. International Data Transfers
-            </h2>
-            <p className="mb-3">
-              18.1. Nestlist primarily stores and processes data within Kenya or in jurisdictions offering adequate data protection safeguards.
-            </p>
-            <p>
-              18.2. Where Personal Data is transferred outside Kenya, we ensure such transfers comply with Section 48 of the Kenya Data Protection Act, 2019, ensuring the recipient country has adequate data protection safeguards, or using appropriate contractual safeguards (such as standard contractual clauses).
-            </p>
-          </section>
+                  <div className="flex items-start gap-2 text-sm">
+                    <span className="text-emerald-700 mt-0.5 font-bold">✓</span>
+                    <div>
+                      <strong>Vercel (Website Hosting):</strong> Host of our web application. Vercel automatically routes and caches assets globally while complying with modern transport encryption rules.
+                      <a href="https://vercel.com/legal/privacy-policy" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-emerald-700 ml-1.5 hover:underline">
+                        Policy <ExternalLink className="h-3 w-3 inline" />
+                      </a>
+                    </div>
+                  </div>
+                </div>
 
-          {/* Section 19 */}
-          <section id="19-privacy-rights" className="scroll-mt-20">
-            <h2 className="text-xl font-bold text-stone-900 border-b border-stone-100 pb-2 mb-4">
-              19. Your Privacy Rights
-            </h2>
-            <p className="mb-3">Depending on your location and applicable law, you may have the following rights in respect of your Personal Data:</p>
+                <div className="bg-stone-50 p-4 rounded-xl border border-stone-200 mt-4">
+                  <h4 className="font-semibold text-stone-900 text-sm mb-1">What we NEVER share:</h4>
+                  <p className="text-xs text-stone-600 leading-relaxed">
+                    We will never share your details with advertisers, commercial third-parties, or other landlords outside of listing inquiries. We do not share information with Kenyan authorities unless presented with a formal court order or explicit legal mandate.
+                  </p>
+                </div>
+              </div>
+            </section>
+
+            {/* SECTION 5 - M-PESA AND PAYMENT DATA */}
+            <section id="mpesa-payments" className="scroll-mt-20">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="flex items-center justify-center w-8 h-8 rounded-full bg-emerald-700 text-white font-mono text-sm font-bold shrink-0">
+                  5
+                </div>
+                <h2 className="font-serif text-xl sm:text-2xl text-stone-900 font-normal">
+                  M-Pesa and Payment Data
+                </h2>
+              </div>
+              <div className="pl-5 border-l-4 border-emerald-700 space-y-4">
+                <p>
+                  As an authentic Kenyan platform, NestList accepts manual mobile payment verification.
+                </p>
+
+                <div className="bg-stone-50 rounded-xl p-5 border border-stone-200 space-y-3">
+                  <h3 className="font-serif text-stone-950 font-normal">How Payments Work:</h3>
+                  <ol className="list-decimal pl-5 space-y-2 text-sm text-stone-700">
+                    <li>Landlord sends the appropriate listing fee via M-Pesa to our designated account number.</li>
+                    <li>Safaricom issues a confirmation SMS with a 10-character reference code (e.g., <strong>QBG582Y78X</strong>).</li>
+                    <li>The Landlord copies and submits this code on our listing creation portal.</li>
+                    <li>Our administrative team checks and approves the transaction internally. Once confirmed, the property immediately goes live.</li>
+                  </ol>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="p-4 bg-emerald-50/40 rounded-xl border border-emerald-100">
+                    <strong className="text-emerald-950 block text-xs uppercase tracking-wider mb-1">We Store:</strong>
+                    <ul className="text-xs text-stone-700 space-y-1">
+                      <li>• Receipt reference code</li>
+                      <li>• Transacting phone number</li>
+                      <li>• Total paid in KES</li>
+                      <li>• Transaction date and time</li>
+                    </ul>
+                  </div>
+                  <div className="p-4 bg-rose-50/40 rounded-xl border border-rose-100">
+                    <strong className="text-rose-950 block text-xs uppercase tracking-wider mb-1">We NEVER Store:</strong>
+                    <ul className="text-xs text-stone-700 space-y-1">
+                      <li>• Your M-Pesa PIN</li>
+                      <li>• Your mobile wallet balance</li>
+                      <li>• Your other unrelated payments</li>
+                      <li>• Bank account credentials</li>
+                    </ul>
+                  </div>
+                </div>
+
+                {/* Highlight Notice */}
+                <div className="bg-emerald-50 border-l-4 border-emerald-700 rounded-r-xl p-4 my-2 text-emerald-950">
+                  <div className="flex gap-2">
+                    <AlertTriangle className="h-5 w-5 text-emerald-800 shrink-0 mt-0.5" />
+                    <p className="text-xs sm:text-sm font-medium">
+                      <strong>Scam Warning:</strong> NestList will never, under any circumstances, call or email you to request your M-Pesa PIN. If someone claiming to represent NestList asks for your PIN, please hang up immediately and report them to us at <a href="mailto:gardisonkirui11@gmail.com" className="underline font-bold">gardisonkirui11@gmail.com</a>.
+                    </p>
+                  </div>
+                </div>
+
+                <p className="text-xs text-stone-500 font-mono">
+                  * Payment metadata records are archived for 7 years to meet auditing and statutory financial guidelines in Kenya.
+                </p>
+              </div>
+            </section>
+
+            {/* SECTION 6 - DATA STORAGE AND SECURITY */}
+            <section id="storage-security" className="scroll-mt-20">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="flex items-center justify-center w-8 h-8 rounded-full bg-emerald-700 text-white font-mono text-sm font-bold shrink-0">
+                  6
+                </div>
+                <h2 className="font-serif text-xl sm:text-2xl text-stone-900 font-normal">
+                  Data Storage and Security
+                </h2>
+              </div>
+              <div className="pl-5 border-l-4 border-emerald-700 space-y-4">
+                <p>
+                  We keep all active account data secured in PostgreSQL relational databases on Supabase servers.
+                </p>
+
+                <div className="bg-stone-50 p-5 rounded-xl border border-stone-200 space-y-3">
+                  <h4 className="font-bold text-stone-950 text-sm">Security Measures Implemented:</h4>
+                  <ul className="list-disc pl-5 space-y-2 text-xs sm:text-sm text-stone-650">
+                    <li><strong>Encrypted Transport:</strong> All data moving between your device and our servers is encrypted using HTTPS / TLS.</li>
+                    <li><strong>Cryptographic Salting:</strong> Passwords are hashed using modern cryptographic bcrypt algorithms, meaning nobody (not even our lead programmers) can read your actual password.</li>
+                    <li><strong>Row-Level Security (RLS):</strong> Our database prevents unauthorized cross-tenant queries. A tenant can never view or modify a landlord's private listing drafts.</li>
+                    <li><strong>Regular Auditing:</strong> Admin privileges are strictly restricted to verified staff only.</li>
+                  </ul>
+                </div>
+
+                <div>
+                  <h3 className="font-serif text-lg text-stone-900 mb-1">Data Retention Limits</h3>
+                  <p className="text-sm">
+                    We do not store information longer than necessary. Our general retention limits are:
+                  </p>
+                  <ul className="list-disc pl-5 mt-1 space-y-1 text-xs text-stone-600 font-mono">
+                    <li>Active Profiles: Retained for the duration of your membership.</li>
+                    <li>Expired Listings: Automatically archived after 2 years.</li>
+                    <li>Payment Auditing Records: Kept for 7 years (Statutory).</li>
+                    <li>SMS Notification Logs: Pruned after 1 year.</li>
+                    <li>Deleted Accounts: Fully purged within 30 days of request.</li>
+                  </ul>
+                </div>
+
+                <div className="bg-rose-50/50 border border-rose-100 rounded-xl p-4 text-xs text-rose-950">
+                  <strong>Breach Protocol:</strong> In the rare event of a malicious system compromise, we will notify affected individuals within 72 hours and report details to the <strong>Office of the Data Protection Commissioner (ODPC) in Kenya</strong>.
+                </div>
+              </div>
+            </section>
+
+            {/* SECTION 7 - YOUR RIGHTS */}
+            <section id="your-rights" className="scroll-mt-20">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="flex items-center justify-center w-8 h-8 rounded-full bg-emerald-700 text-white font-mono text-sm font-bold shrink-0">
+                  7
+                </div>
+                <h2 className="font-serif text-xl sm:text-2xl text-stone-900 font-normal">
+                  Your Rights
+                </h2>
+              </div>
+              <div className="pl-5 border-l-4 border-emerald-700 space-y-4">
+                <p>
+                  Under Section 26 of <strong>Kenya's Data Protection Act, 2019</strong>, you possess the following critical rights:
+                </p>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs sm:text-sm">
+                  <div className="p-4 bg-stone-50 rounded-lg border border-stone-200">
+                    <strong className="text-stone-950 block mb-1">1. Right to Access:</strong>
+                    You can ask us for a complete copy of all your private details held on our platform.
+                  </div>
+                  <div className="p-4 bg-stone-50 rounded-lg border border-stone-200">
+                    <strong className="text-stone-950 block mb-1">2. Right to Correction:</strong>
+                    You can update incorrect profile names, emails, phone numbers, or listing prices inside your dashboard anytime.
+                  </div>
+                  <div className="p-4 bg-stone-50 rounded-lg border border-stone-200">
+                    <strong className="text-stone-950 block mb-1">3. Right to Deletion:</strong>
+                    You can request complete account removal. We will delete or anonymize your listings within 30 days.
+                  </div>
+                  <div className="p-4 bg-stone-50 rounded-lg border border-stone-200">
+                    <strong className="text-stone-950 block mb-1">4. Right to Object:</strong>
+                    You can ask us to stop sending you promotional texts, alerts, or marketing emails.
+                  </div>
+                </div>
+
+                <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-5 text-stone-950">
+                  <p className="font-bold text-emerald-950 mb-1">How to exercise your rights:</p>
+                  <p className="text-xs sm:text-sm text-stone-800 leading-relaxed">
+                    Simply write to us at <a href="mailto:gardisonkirui11@gmail.com" className="underline font-bold text-emerald-850">gardisonkirui11@gmail.com</a> or reach out on our support phone: <a href="tel:+254715185037" className="underline font-bold text-emerald-850">+254715185037</a>. We will verify your identity first to protect your account and respond to your request within <strong>14 days</strong>.
+                  </p>
+                </div>
+
+                <p className="text-xs text-stone-600">
+                  If you feel we have not handled your privacy request adequately, you can raise an official complaint with the Kenyan regulator:
+                  <br />
+                  <strong>Office of the Data Protection Commissioner (ODPC) Kenya</strong>
+                  <br />
+                  Website: <a href="https://www.odpc.go.ke" target="_blank" rel="noopener noreferrer" className="text-emerald-700 underline">odpc.go.ke</a> | Email: <a href="mailto:info@odpc.go.ke" className="text-emerald-700 underline">info@odpc.go.ke</a>
+                </p>
+              </div>
+            </section>
+
+            {/* SECTION 8 - COOKIES AND TRACKING */}
+            <section id="cookies-tracking" className="scroll-mt-20">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="flex items-center justify-center w-8 h-8 rounded-full bg-emerald-700 text-white font-mono text-sm font-bold shrink-0">
+                  8
+                </div>
+                <h2 className="font-serif text-xl sm:text-2xl text-stone-900 font-normal">
+                  Cookies and Tracking
+                </h2>
+              </div>
+              <div className="pl-5 border-l-4 border-emerald-700 space-y-4">
+                <p>
+                  NestList uses browser cookies and local storage tokens to ensure your interface remains fast, modern, and easy to use.
+                </p>
+
+                <div className="space-y-3">
+                  <div className="p-4 bg-stone-50 rounded-xl border border-stone-150">
+                    <strong className="text-stone-950 text-sm block mb-1">Essential Authentication Cookie:</strong>
+                    <p className="text-xs text-stone-600">
+                      We store a temporary login token on your browser to keep you logged in between visits. This cookie is critical for account security and cannot be disabled.
+                    </p>
+                  </div>
+
+                  <div className="p-4 bg-stone-50 rounded-xl border border-stone-150">
+                    <strong className="text-stone-950 text-sm block mb-1">Functional Preferences & Caching:</strong>
+                    <p className="text-xs text-stone-600">
+                      We utilize local storage keys to remember your filter selections (such as preferred countys or rental price thresholds) so you don't have to retype them every time.
+                    </p>
+                  </div>
+                </div>
+
+                <p className="text-xs text-stone-600">
+                  <strong>No Tracking Abuse:</strong> We do NOT employ intrusive third-party cookies, behavioral trackers, or cross-site advertisement scripts. We don't share your search patterns with Google, Meta, or external brokers.
+                </p>
+              </div>
+            </section>
+
+            {/* SECTION 9 - CHILDREN'S PRIVACY */}
+            <section id="childrens-privacy" className="scroll-mt-20">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="flex items-center justify-center w-8 h-8 rounded-full bg-emerald-700 text-white font-mono text-sm font-bold shrink-0">
+                  9
+                </div>
+                <h2 className="font-serif text-xl sm:text-2xl text-stone-900 font-normal">
+                  Children's Privacy
+                </h2>
+              </div>
+              <div className="pl-5 border-l-4 border-emerald-700 space-y-3">
+                <p>
+                  NestList is strictly intended for adult users who are <strong>18 years of age and above</strong> (the legal age to sign tenancy agreements or own property in Kenya). We do not intentionally collect, store, or solicit data from minors under 18 years.
+                </p>
+                <p>
+                  If you discover that a child has created an unauthorized profile on our website, please notify us immediately at <a href="mailto:gardisonkirui11@gmail.com" className="text-emerald-700 underline font-medium">gardisonkirui11@gmail.com</a>. We will immediately delete their information from our systems.
+                </p>
+              </div>
+            </section>
+
+            {/* SECTION 10 - CHANGES TO THIS POLICY */}
+            <section id="policy-changes" className="scroll-mt-20">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="flex items-center justify-center w-8 h-8 rounded-full bg-emerald-700 text-white font-mono text-sm font-bold shrink-0">
+                  10
+                </div>
+                <h2 className="font-serif text-xl sm:text-2xl text-stone-900 font-normal">
+                  Changes to This Policy
+                </h2>
+              </div>
+              <div className="pl-5 border-l-4 border-emerald-700 space-y-3">
+                <p>
+                  We may occasionally update this Privacy Policy to match new legal guidelines or technical upgrades on NestList.
+                </p>
+                <p>
+                  Whenever we make significant changes to this policy, we will:
+                </p>
+                <ul className="list-disc pl-5 space-y-1 text-sm text-stone-600">
+                  <li>Change the "Last Updated" date at the top of this page.</li>
+                  <li>Email or SMS a notification to our active registered landlords and tenants.</li>
+                  <li>Display a highly visible alert banner on our main website homepage.</li>
+                </ul>
+                <p className="text-stone-600 text-sm">
+                  By continuing to log in or post property listings after we publish these changes, you accept the updated practices.
+                </p>
+              </div>
+            </section>
+
+            {/* SECTION 11 - CONTACT US */}
+            <section id="contact-us" className="scroll-mt-20">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="flex items-center justify-center w-8 h-8 rounded-full bg-emerald-700 text-white font-mono text-sm font-bold shrink-0">
+                  11
+                </div>
+                <h2 className="font-serif text-xl sm:text-2xl text-stone-900 font-normal">
+                  Contact Us
+                </h2>
+              </div>
+              <div className="pl-5 border-l-4 border-emerald-700 space-y-4">
+                <p>
+                  If you have any questions, clarifications, or complaints regarding this Privacy Policy or would like to exercise your data subject rights, please don't hesitate to reach out to us:
+                </p>
+
+                <div className="bg-stone-50 rounded-2xl p-6 border border-stone-200 grid grid-cols-1 sm:grid-cols-2 gap-6 text-sm">
+                  <div className="space-y-2">
+                    <p className="font-bold text-stone-950 font-serif">Corporate Address</p>
+                    <p className="text-stone-600">
+                      Nestlist Rental Platforms Limited<br />
+                      Registration: BN-P7SEPZD3<br />
+                      Nairobi, Kenya
+                    </p>
+                  </div>
+                  <div className="space-y-2.5">
+                    <p className="font-bold text-stone-950 font-serif">Contact Channels</p>
+                    <p className="flex items-center gap-2 text-stone-600">
+                      <Mail className="h-4 w-4 text-emerald-700" />
+                      <a href="mailto:gardisonkirui11@gmail.com" className="hover:text-emerald-800 hover:underline">gardisonkirui11@gmail.com</a>
+                    </p>
+                    <p className="flex items-center gap-2 text-stone-600">
+                      <Phone className="h-4 w-4 text-emerald-700" />
+                      <a href="tel:+254715185037" className="hover:text-emerald-800 hover:underline">+254 715 185 037</a>
+                    </p>
+                  </div>
+                </div>
+
+                <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-4 text-xs text-stone-700">
+                  We endeavor to reply to all general privacy inquiries within <strong>2 business days</strong> and process formal data deletion/access requests within <strong>14 calendar days</strong>.
+                </div>
+              </div>
+            </section>
             
-            <div className="space-y-3 pl-4 border-l-2 border-amber-500 my-4 text-stone-650">
-              <p><strong>Under the Kenya Data Protection Act, 2019:</strong> Right to be informed of the use of data, right of access, right to object, right to correction/rectification, right to erasure of false or unlawfully obtained data, right to portability, and right to lodge a complaint with the ODPC.</p>
-              <p><strong>Under the GDPR / UK GDPR:</strong> Right of access (Art 15), rectification (Art 16), erasure (Art 17), restriction (Art 18), portability (Art 20), objection (Art 21), and rights related to automated decisions (Art 22).</p>
+            {/* Quick Back to Browse Link */}
+            <div className="pt-8 border-t border-stone-200 flex justify-between items-center text-xs text-stone-500">
+              <p>© 2026 Nestlist Rental Platforms Limited. Registered under BN-P7SEPZD3, Kenya.</p>
+              <Link to="/" className="text-emerald-700 hover:text-emerald-800 font-bold underline transition">
+                Back to main platform
+              </Link>
             </div>
-            <p>
-              To exercise any of these rights, please contact our Data Protection Officer at <strong>privacy@nestlist.co.ke</strong>. We will respond to verified requests within the required timeframes.
-            </p>
-          </section>
 
-          {/* Section 20 */}
-          <section id="20-account-deletion" className="scroll-mt-20">
-            <h2 className="text-xl font-bold text-stone-900 border-b border-stone-100 pb-2 mb-4">
-              20. Account and Data Deletion
-            </h2>
-            <p className="mb-3">
-              20.1. You may request deletion of your Nestlist account at any time via the account settings menu or by emailing our support team.
-            </p>
-            <p className="mb-3">
-              20.2. Upon account deletion, we will delete or anonymize your Personal Data within a reasonable period, except where retention is required by law, to resolve disputes, or to prevent fraud.
-            </p>
-            <p>
-              20.3. Reviews you have posted or messages sent to other Users may remain visible in an anonymized or "Deleted User" format, unless removal is legally required.
-            </p>
-          </section>
-
-          {/* Section 21 */}
-          <section id="21-childrens-privacy" className="scroll-mt-20">
-            <h2 className="text-xl font-bold text-stone-900 border-b border-stone-100 pb-2 mb-4">
-              21. Children's Privacy
-            </h2>
-            <p className="mb-3">
-              21.1. Nestlist is intended for use by individuals who are at least 18 years old. We do not knowingly collect Personal Data from children.
-            </p>
-            <p>
-              21.2. If we become aware that we have inadvertently collected Personal Data from a minor without parental consent, we will take steps to delete such information promptly.
-            </p>
-          </section>
-
-          {/* Section 22 */}
-          <section id="22-reviews-ratings" className="scroll-mt-20">
-            <h2 className="text-xl font-bold text-stone-900 border-b border-stone-100 pb-2 mb-4">
-              22. Reviews, Ratings, and User-Generated Content
-            </h2>
-            <p className="mb-3">
-              22.1. Nestlist enables Users to submit reviews, ratings, and feedback regarding properties, Landlords, and Agents. Content submitted through these features may be publicly visible on the Platform.
-            </p>
-            <p>
-              22.2. Please exercise discretion when submitting reviews, as such content may include Personal Data that becomes publicly accessible.
-            </p>
-          </section>
-
-          {/* Section 23 */}
-          <section id="23-referral-program" className="scroll-mt-20">
-            <h2 className="text-xl font-bold text-stone-900 border-b border-stone-100 pb-2 mb-4">
-              23. Referral Program and Loyalty Points
-            </h2>
-            <p className="mb-3">
-              23.1. Where you participate in Nestlist's referral program, we may collect information about the individuals you refer, including their name and contact details, for tracking rewards.
-            </p>
-            <p>
-              23.2. Loyalty points and referral activity are tied to your account and used to calculate eligibility for rewards, discounts, or premium features.
-            </p>
-          </section>
-
-          {/* Section 24 */}
-          <section id="24-mobile-app" className="scroll-mt-20">
-            <h2 className="text-xl font-bold text-stone-900 border-b border-stone-100 pb-2 mb-4">
-              24. Mobile App-Specific Disclosures (Google Play / Apple App Store)
-            </h2>
-            <p className="mb-3">
-              24.1. In accordance with Google Play's Data Safety and Apple's App Store Privacy nutrition labels, we disclose the categories of data collected and whether data is shared in the respective app store listings.
-            </p>
-            <p className="mb-3">
-              24.2. Our mobile applications may request permissions such as Location, Camera, Notifications, and Storage. You may manage or revoke these permissions in your device settings.
-            </p>
-            <p>
-              24.3. Crash reporting tools collect technical diagnostic data to help us identify and resolve technical issues.
-            </p>
-          </section>
-
-          {/* Section 25 */}
-          <section id="25-complaints" className="scroll-mt-20">
-            <h2 className="text-xl font-bold text-stone-900 border-b border-stone-100 pb-2 mb-4">
-              25. Complaints Procedure
-            </h2>
-            <p className="mb-3">
-              25.1. If you have concerns about how we process your Personal Data, please contact us first so we may investigate and resolve your concern.
-            </p>
-            <p className="mb-3">
-              25.2. If you are not satisfied with our response, you have the right to lodge a complaint with:
-            </p>
-            <p className="font-bold text-stone-900">
-              The Office of the Data Protection Commissioner (ODPC), Kenya
-            </p>
-            <p className="text-sm font-mono text-stone-500 mt-1">
-              Website: www.odpc.go.ke
-            </p>
-          </section>
-
-          {/* Section 26 */}
-          <section id="26-changes-policy" className="scroll-mt-20">
-            <h2 className="text-xl font-bold text-stone-900 border-b border-stone-100 pb-2 mb-4">
-              26. Changes to This Privacy Policy
-            </h2>
-            <p className="mb-3">
-              26.1. We may update this Privacy Policy from time to time to reflect changes in our practices, technology, legal requirements, or for other operational reasons.
-            </p>
-            <p>
-              26.2. Where changes are material, we will provide notice through the Platform or by email prior to the changes taking effect. Continued use of the Platform after changes take effect constitutes acceptance.
-            </p>
-          </section>
-
-          {/* Section 27 */}
-          <section id="27-liability-disclaimers" className="scroll-mt-20">
-            <h2 className="text-xl font-bold text-stone-900 border-b border-stone-100 pb-2 mb-4">
-              27. Limitation of Liability and Disclaimers
-            </h2>
-            <p className="mb-3">
-              27.1. Nestlist acts as a marketplace facilitating connections between Tenants, Landlords, Property Managers, and Agents. We do not own, manage, or guarantee the accuracy of property listings, and we are not a party to any tenancy, lease, or sale agreement entered into between Users.
-            </p>
-            <p className="mb-3">
-              27.2. While we implement verification processes and fraud-prevention measures, Nestlist does not guarantee that all listings or User identities are accurate or free from fraud.
-            </p>
-            <p>
-              27.3. To the maximum extent permitted by applicable law, Nestlist shall not be liable for any indirect, incidental, consequential, or punitive damages arising from your use of the Platform, except where such liability cannot be excluded under Kenyan law or other applicable mandatory law.
-            </p>
-          </section>
-
-          {/* Section 28 */}
-          <section id="28-contact-info" className="scroll-mt-20">
-            <h2 className="text-xl font-bold text-stone-900 border-b border-stone-100 pb-2 mb-4">
-              28. Contact Information
-            </h2>
-            <p className="mb-3">
-              If you have any questions, concerns, or requests regarding this Privacy Policy or our data processing practices, please contact us at:
-            </p>
-            <div className="bg-stone-50 border border-stone-200 rounded-xl p-5 text-xs sm:text-sm text-stone-600 space-y-1.5 font-mono">
-              <p className="font-bold text-stone-850">Nestlist Data Protection Office</p>
-              <p>Email: privacy@nestlist.co.ke</p>
-              <p>Phone: +254 700 000000</p>
-              <p>Address: Nairobi, Kenya</p>
-            </div>
-          </section>
-
-          {/* Section 29 */}
-          <section id="29-acknowledgment" className="scroll-mt-20">
-            <h2 className="text-xl font-bold text-stone-900 border-b border-stone-100 pb-2 mb-4">
-              29. Acknowledgment and Consent
-            </h2>
-            <p className="mb-4">
-              By creating an account, accessing, or otherwise using Nestlist's website, mobile applications, or any related Services, you acknowledge that you have read and understood this Privacy Policy and consent to the collection, use, disclosure, and processing of your Personal Data as described herein. If you do not agree to this Privacy Policy, you must discontinue use of the Platform immediately.
-            </p>
-            <div className="bg-amber-50 border border-amber-200 rounded-2xl p-6 text-center text-stone-700">
-              <p className="font-semibold text-amber-900 mb-1">
-                Thank you for choosing Nestlist
-              </p>
-              <p className="text-xs text-stone-500">
-                We are proud to serve and connect communities across Kenya with secure, transparent, and modern property technology.
-              </p>
-            </div>
-          </section>
-
+          </main>
         </div>
       </div>
     </div>

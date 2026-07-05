@@ -366,6 +366,17 @@ export const Signup: React.FC = () => {
             {loading ? "Creating..." : `Create ${role === "tenant" ? "Tenant" : "Landlord"} account →`}
           </button>
         </form>
+
+        <div style={{ marginTop: "24px", textAlign: "center", fontSize: "12px", color: "#6B7280", lineHeight: "1.5" }}>
+          By creating an account you agree to our{" "}
+          <Link to="#" style={{ color: "#4B5563", fontWeight: "600", textDecoration: "underline" }}>
+            Terms of Service
+          </Link>{" "}
+          and{" "}
+          <Link to="/privacy" style={{ color: "#1E6B4A", fontWeight: "700", textDecoration: "underline" }}>
+            Privacy Policy
+          </Link>.
+        </div>
       </div>
     </div>
   );

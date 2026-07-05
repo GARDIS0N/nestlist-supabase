@@ -9,6 +9,8 @@ export interface Profile {
   phone: string | null;
   role: "landlord" | "tenant" | "admin" | null;
   avatar_url: string | null;
+  email_notifications?: boolean;
+  sms_notifications?: boolean;
   created_at: string;
 }
 

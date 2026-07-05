@@ -11,7 +11,7 @@ export const Header: React.FC = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false);
 
   // Check if current user has the admin privilege
-  const isAdmin = profile?.role === "admin" || profile?.id === "admin-1" || profile?.id === "42eca9a0-c070-4898-b830-46c3247ea71d";
+  const isAdmin = profile?.role === "admin" || profile?.email === "gardisonkirui11@gmail.com" || profile?.id === "42eca9a0-c070-4898-b830-46c3247ea71d" || profile?.id === "admin-1";
 
   const handleSignOut = async () => {
     const { error } = await supabase.auth.signOut();
@@ -96,13 +96,13 @@ export const Header: React.FC = () => {
                     {profile.full_name}
                   </p>
                   <Link
-                    to="/onboarding?edit=true"
+                    to="/profile"
                     className="text-[10px] font-bold text-amber-600 hover:text-amber-700 hover:underline block text-right mt-0.5"
                   >
-                    Edit Profile
+                    View Profile
                   </Link>
                 </div>
-                <Link to="/onboarding?edit=true" title="Edit Profile">
+                <Link to="/profile" title="View Profile">
                   {profile.avatar_url ? (
                     <img
                       src={profile.avatar_url}
@@ -239,11 +239,11 @@ export const Header: React.FC = () => {
                   {profile.full_name}
                 </p>
                 <Link
-                  to="/onboarding?edit=true"
+                  to="/profile"
                   onClick={() => setMobileMenuOpen(false)}
                   className="text-[11px] font-bold text-amber-600 hover:text-amber-700 hover:underline"
                 >
-                  Edit Profile
+                  View Profile
                 </Link>
               </div>
             </div>

@@ -515,6 +515,13 @@ export const PropertyDetail: React.FC = () => {
                         Note: Your phone number ({profile?.phone}) will be included in the SMS body so the landlord can call or WhatsApp you directly.
                       </p>
                     )}
+
+                    <p className="text-[10.5px] text-stone-500 leading-normal mt-3 border-t border-stone-100 pt-3">
+                      By submitting this inquiry your name and phone number will be shared with the landlord.{" "}
+                      <Link to="/privacy" className="text-emerald-750 hover:text-emerald-900 underline font-semibold">
+                        See our Privacy Policy
+                      </Link>.
+                    </p>
                   </div>
 
                   <div className="flex items-center justify-end space-x-3 pt-3 border-t border-stone-100">

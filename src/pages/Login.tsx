@@ -234,9 +234,12 @@ export const Login: React.FC = () => {
           </button>
         </form>
 
-        <div style={{ marginTop: "24px" }}>
+        <div style={{ marginTop: "24px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <Link to="/signup" style={{ fontSize: "13px", color: "#6B7280", textDecoration: "none" }}>
             Forgot password?
+          </Link>
+          <Link to="/privacy" style={{ fontSize: "13px", color: "#1E6B4A", fontWeight: "600", textDecoration: "underline" }}>
+            Privacy Policy
           </Link>
         </div>
       </div>

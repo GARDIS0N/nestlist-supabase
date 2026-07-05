@@ -14,10 +14,12 @@ import { SavedProperties } from "./pages/SavedProperties";
 import { SearchAlerts } from "./pages/SearchAlerts";
 import { LandlordDashboard } from "./pages/LandlordDashboard";
 import { ListProperty } from "./pages/ListProperty";
-import { Admin } from "./pages/Admin";
+import { AdminPanel } from "./pages/Admin";
 import { Privacy } from "./pages/Privacy";
+import { Profile } from "./pages/Profile";
 import AuthCallback from "./pages/AuthCallback";
 import { DevConnectionBanner } from "./components/DevConnectionBanner";
+import { CookieBanner } from "./components/CookieBanner";
 
 export default function App() {
   return (
@@ -120,7 +122,17 @@ export default function App() {
                 path="/admin"
                 element={
                   <ProtectedRoute role="admin">
-                    <Admin />
+                    <AdminPanel />
+                  </ProtectedRoute>
+                }
+              />
+
+              {/* User Profile (Tenants, Landlords, Admins) */}
+              <Route
+                path="/profile"
+                element={
+                  <ProtectedRoute>
+                    <Profile />
                   </ProtectedRoute>
                 }
               />
@@ -155,6 +167,7 @@ export default function App() {
               </p>
             </div>
           </footer>
+          <CookieBanner />
           <DevConnectionBanner />
         </div>
       </BrowserRouter>

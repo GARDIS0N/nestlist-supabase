@@ -3,18 +3,20 @@ create extension if not exists "uuid-ossp";
 
 -- ── PROFILES ─────────────────────────────────────
 create table if not exists profiles (
-  id           text primary key,
-  full_name    text,
-  phone        text,
-  email        text,
-  role         text check (role in (
+  id                  text primary key,
+  full_name           text,
+  phone               text,
+  email               text,
+  role                text check (role in (
     'landlord','caretaker','agent',
     'tenant','admin','superadmin'
   )) default 'tenant',
-  avatar_url   text,
-  is_active    boolean default true,
-  created_at   timestamptz default now(),
-  updated_at   timestamptz default now()
+  avatar_url          text,
+  is_active           boolean default true,
+  email_notifications  boolean default true,
+  sms_notifications    boolean default true,
+  created_at          timestamptz default now(),
+  updated_at          timestamptz default now()
 );
 
 -- ── PROPERTIES ───────────────────────────────────
