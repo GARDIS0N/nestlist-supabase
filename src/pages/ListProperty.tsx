@@ -113,6 +113,7 @@ export const ListProperty: React.FC = () => {
             type: selectedType,
             amenities: selectedAmenities,
             images: uploadedImages,
+            status: "available",
             is_active: false
           })
           .select()
