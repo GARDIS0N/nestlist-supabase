@@ -146,7 +146,7 @@ export const ListProperty: React.FC = () => {
     }
   };
 
-  // Step 5 Submit Manual Payment -> Post M-Pesa Code to backend verification endpoint
+  // Step 5 Submit Manual Payment -> Direct Supabase Insertion and Verification
   const handleSubmitManualPayment = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!profile || !propertyId || !mpesaCode) return;
@@ -154,49 +154,84 @@ export const ListProperty: React.FC = () => {
     setPaying(true);
     setPaymentError(null);
 
-    const fee = getListingFee(selectedType);
-
     try {
-      // 1. Post to Express Backend manual verification API
-      const response = await fetch(`/api/listings/${propertyId}/payment`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          mpesa_code: mpesaCode,
-          mpesa_phone: mpesaPhone,
-          amount_paid: fee
-        })
-      });
+      const cleanCode = mpesaCode.trim().toUpperCase();
 
-      const resData = await response.json();
-
-      if (!response.ok) {
-        throw new Error(resData.error || "Could not submit payment code. Please check code format.");
+      // Validate code format
+      if (!/^[A-Z0-9]{8,12}$/.test(cleanCode)) {
+        setPaymentError('Invalid M-Pesa code format. Example: UG42KAHXNA');
+        setPaying(false);
+        return;
       }
 
-      // 2. Synchronize frontend local client (localStorage / Supabase Simulator)
-      const { error } = await supabase
-        .from("listing_payments")
+      // Check for duplicate M-Pesa code
+      const { data: duplicate } = await supabase
+        .from('listing_payments')
+        .select('id')
+        .eq('mpesa_code', cleanCode)
+        .maybeSingle();
+
+      if (duplicate) {
+        setPaymentError('This M-Pesa code has already been submitted.');
+        setPaying(false);
+        return;
+      }
+
+      // Get property details
+      const { data: property, error: propError } = await supabase
+        .from('properties')
+        .select('id, landlord_id, type, price')
+        .eq('id', propertyId)
+        .single();
+
+      if (propError || !property) {
+        setPaymentError('Property not found. Please go back and try again.');
+        setPaying(false);
+        return;
+      }
+
+      const LISTING_FEES: Record<string, number> = {
+        single_room: 100,
+        bedsitter: 200,
+        studio: 250,
+        '1br': 500,
+        '2br': 700,
+        '3br': 1000,
+        '4br': 1200,
+        '5br_plus': 1500,
+      };
+
+      const expectedFee = LISTING_FEES[property.type] ?? 500;
+
+      // Insert payment record into Supabase
+      const { error: paymentError } = await supabase
+        .from('listing_payments')
         .insert({
           property_id: propertyId,
-          landlord_id: profile.id,
-          amount: fee,
-          property_type: selectedType,
-          mpesa_code: mpesaCode.trim().toUpperCase(),
-          mpesa_checkout_request_id: `MANUAL-${propertyId}-${mpesaCode.trim().toUpperCase()}`,
-          amount_paid: fee,
+          landlord_id: property.landlord_id,
+          amount: expectedFee,
+          property_type: property.type,
+          mpesa_code: cleanCode,
+          mpesa_checkout_request_id: `MANUAL-${propertyId}-${cleanCode}`,
+          amount_paid: expectedFee,
           payer_phone: mpesaPhone || null,
-          status: "pending"
+          status: 'pending',
         });
 
-      if (error) {
-        console.error("Failed to update local property state:", error);
+      if (paymentError) {
+        if (paymentError.code === '23505') {
+          setPaymentError('This M-Pesa code has already been submitted.');
+        } else {
+          setPaymentError('Could not submit payment: ' + paymentError.message);
+        }
+        setPaying(false);
+        return;
       }
 
       setPaymentStatus("pending_verification");
     } catch (err: any) {
       console.error("Payment submission failed:", err);
-      setPaymentError(err.message || "Connection to verification server failed.");
+      setPaymentError('Payment submission failed. Please check your connection.');
     } finally {
       setPaying(false);
     }
@@ -539,9 +574,13 @@ export const ListProperty: React.FC = () => {
                 <p className="text-stone-500 text-sm leading-relaxed max-w-sm mx-auto">
                   Your payment submission is received! Our administrators are manually cross-referencing your code <span className="font-mono font-bold text-stone-950">{mpesaCode.toUpperCase()}</span>.
                 </p>
-                <div className="bg-amber-50/50 border border-amber-100 rounded-xl p-4 text-xs text-amber-900 font-medium max-w-md mx-auto mt-4 space-y-1">
-                  <p>✓ Code Submitted: {mpesaCode.toUpperCase()}</p>
-                  <p>✓ Amount to Verify: KSh {getListingFee(selectedType)}</p>
+                <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 text-xs text-emerald-950 font-medium max-w-md mx-auto mt-4 space-y-2">
+                  <p className="text-sm font-semibold text-emerald-800">
+                    ✅ Payment submitted! Your listing will go live within 1 hour once our team verifies your M-Pesa payment.
+                  </p>
+                  <hr className="border-emerald-100" />
+                  <p className="text-stone-700">✓ Code Submitted: {mpesaCode.toUpperCase()}</p>
+                  <p className="text-stone-700">✓ Amount to Verify: KSh {getListingFee(selectedType)}</p>
                   <p className="text-stone-500 font-normal pt-1">
                     Manual verification takes between 1 to 2 hours during normal business hours. Your listing will automatically go live once approved!
                   </p>
