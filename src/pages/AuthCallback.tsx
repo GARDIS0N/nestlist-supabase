@@ -24,9 +24,9 @@ export default function AuthCallback() {
         navigate("/onboarding");
       } else {
         // Existing user — redirect by role
-        if (profile.role === "admin" || profile.role === "superadmin") {
+        if (profile.role === "admin") {
           navigate("/admin");
-        } else if (["landlord", "caretaker", "agent"].includes(profile.role)) {
+        } else if (profile.role === "landlord") {
           navigate("/dashboard");
         } else {
           navigate("/");

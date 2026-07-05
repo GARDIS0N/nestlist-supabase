@@ -51,11 +51,9 @@ export const Login: React.FC = () => {
 
     setLoading(false);
 
-    if (profile?.role === 'admin' || 
-        profile?.role === 'superadmin') {
+    if (profile?.role === 'admin') {
       navigate('/admin');
-    } else if (['landlord','caretaker','agent']
-        .includes(profile?.role || '')) {
+    } else if (profile?.role === 'landlord') {
       navigate('/dashboard');
     } else {
       navigate('/');

@@ -82,15 +82,16 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, role }
     return <Navigate to="/onboarding" replace />;
   }
 
-  // 4. If role prop is provided and profile.role does not match
-  if (role && profile.role !== role) {
-    // If profile.role is 'admin', allow access to everything
-    if (profile.role === "admin") {
+  // If a specific role is required
+  if (role) {
+    // Admin can access everything — never redirect admin
+    if (profile.role === 'admin') {
       return <>{children}</>;
-    } else {
-      // Otherwise redirect to their home page (landlord -> /dashboard, tenant -> /)
-      const homePath = profile.role === "landlord" ? "/dashboard" : "/";
-      return <Navigate to={homePath} replace />;
+    }
+    // Other roles must match exactly
+    if (profile.role !== role) {
+      const home = profile.role === 'landlord' ? '/dashboard' : '/';
+      return <Navigate to={home} replace />;
     }
   }
 

@@ -78,10 +78,9 @@ export const Header: React.FC = () => {
                 </Link>
               )}
 
-              {isAdmin && (
+              {profile?.role === "admin" && (
                 <Link to="/admin" className={linkStyle("/admin")}>
-                  <Shield className="h-4 w-4 text-amber-700" />
-                  <span>Admin</span>
+                  <span>🔐 Admin Panel</span>
                 </Link>
               )}
             </nav>
@@ -207,7 +206,7 @@ export const Header: React.FC = () => {
             </Link>
           )}
 
-          {isAdmin && (
+          {profile?.role === "admin" && (
             <Link
               to="/admin"
               onClick={() => setMobileMenuOpen(false)}
@@ -215,8 +214,7 @@ export const Header: React.FC = () => {
                 isActive("/admin") ? "bg-amber-100 text-amber-900" : "text-stone-700"
               }`}
             >
-              <Shield className="h-5 w-5 text-amber-700" />
-              <span>Admin Management</span>
+              <span>🔐 Admin Panel</span>
             </Link>
           )}
 

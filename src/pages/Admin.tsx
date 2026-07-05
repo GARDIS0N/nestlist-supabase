@@ -11,6 +11,13 @@ import {
 export const AdminPanel: React.FC = () => {
   const { profile } = useAuth();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    if (profile && profile.role !== 'admin') {
+      navigate('/', { replace: true });
+    }
+  }, [profile]);
+
   const [activeTab, setActiveTab] = useState<"payments" | "listings" | "users">("payments");
   const [loading, setLoading] = useState(true);
 
@@ -30,11 +37,9 @@ export const AdminPanel: React.FC = () => {
     }, 4500);
   };
 
-  // Admin access validation
-  const isAdmin = profile?.role === "admin" || 
-                  profile?.email === "gardisonkirui11@gmail.com" || 
-                  profile?.id === "42eca9a0-c070-4898-b830-46c3247ea71d" || 
-                  profile?.id === "admin-1";
+  if (profile?.role !== 'admin') {
+    return null;
+  }
 
   // Data Fetching functions
   const fetchPendingPayments = async () => {
@@ -102,7 +107,7 @@ export const AdminPanel: React.FC = () => {
 
   // Trigger initial fetch when tab changes
   useEffect(() => {
-    if (isAdmin) {
+    if (profile?.role === 'admin') {
       refreshData();
     }
   }, [activeTab, profile]);
@@ -194,27 +199,6 @@ export const AdminPanel: React.FC = () => {
       showToast("Error updating listing status: " + err.message, "error");
     }
   };
-
-  if (!isAdmin) {
-    return (
-      <div className="max-w-md mx-auto py-20 px-4 text-center font-sans" id="admin-forbidden-view">
-        <div className="p-3 bg-rose-50 border border-rose-100 rounded-full w-14 h-14 flex items-center justify-center text-rose-700 mx-auto mb-5">
-          <Shield className="h-7 w-7" />
-        </div>
-        <h1 className="text-xl font-bold text-stone-900 tracking-tight">Access Restricted</h1>
-        <p className="text-stone-500 text-sm mt-2 mb-6 leading-relaxed">
-          The Admin Portal is exclusive to verified platform administrators.
-        </p>
-        <Link 
-          to="/" 
-          className="inline-flex items-center gap-1.5 bg-gradient-to-r from-emerald-800 to-emerald-700 hover:from-emerald-750 hover:to-emerald-650 text-white font-medium text-xs py-2 px-5 rounded-full shadow-sm hover:shadow transition-all active:scale-95"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          <span>Return to Homepage</span>
-        </Link>
-      </div>
-    );
-  }
 
   return (
     <div className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8 font-sans" id="admin-panel-page">
