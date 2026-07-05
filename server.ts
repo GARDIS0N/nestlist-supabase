@@ -437,8 +437,7 @@ app.post('/api/listings', async (req, res) => {
           amenities: amenities || [],
           images: images || [],
           landlord_id: landlordId,
-          is_active: false,
-          payment_status: 'unpaid'
+          is_active: false
         })
         .select()
         .single();
@@ -462,7 +461,6 @@ app.post('/api/listings', async (req, res) => {
       images: images || [],
       landlord_id: landlordId,
       is_active: false,
-      payment_status: 'unpaid',
       view_count: 0,
       inquiry_count: 0,
       created_at: new Date().toISOString(),
@@ -644,12 +642,7 @@ app.post('/api/listings/:id/payment', async (req, res) => {
 
       if (insErr) throw insErr;
 
-      // Update property status
-      await supabaseClient
-        .from('properties')
-        .update({ payment_status: 'pending_verification' })
-        .eq('id', id);
-
+      // Update property status is not needed since properties does not have payment_status, listing_payments tracks this
       // Get Landlord Profile
       const { data: prof } = await supabaseClient
         .from('profiles')
@@ -688,7 +681,6 @@ app.post('/api/listings/:id/payment', async (req, res) => {
     };
 
     db.listing_payments.push(newPayment);
-    prop.payment_status = 'pending_verification';
     saveMockDb(db);
 
     landlord = db.profiles.find(p => p.id === property.landlord_id) || { full_name: "Mock Landlord", phone: payerPhone };
@@ -843,9 +835,7 @@ app.post('/api/admin/payments/:id/verify', async (req, res) => {
         .from('properties')
         .update({
           is_active: true,
-          payment_status: 'verified',
-          expires_at: expiry,
-          rejection_reason: null
+          expires_at: expiry
         })
         .eq('id', id);
 
@@ -876,9 +866,7 @@ app.post('/api/admin/payments/:id/verify', async (req, res) => {
 
     const expiry = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
     prop.is_active = true;
-    prop.payment_status = 'verified';
     prop.expires_at = expiry;
-    prop.rejection_reason = null;
 
     saveMockDb(db);
 
@@ -956,8 +944,6 @@ app.post('/api/admin/payments/:id/reject', async (req, res) => {
       await supabaseClient
         .from('properties')
         .update({
-          payment_status: 'rejected',
-          rejection_reason: reason,
           is_active: false
         })
         .eq('id', id);
@@ -984,8 +970,6 @@ app.post('/api/admin/payments/:id/reject', async (req, res) => {
       payment.rejection_reason = reason;
     }
 
-    prop.payment_status = 'rejected';
-    prop.rejection_reason = reason;
     prop.is_active = false;
 
     saveMockDb(db);
@@ -1689,7 +1673,7 @@ app.post('/api/admin/expire-listings', async (req, res) => {
           if (phone) {
             await sendSMS(phone, `NestList: Your property listing '${p.title}' has expired. It is no longer visible to tenants. Pay to reactivate.`, 'listing_expired');
           }
-          await supabaseClient.from('properties').update({ is_active: false, payment_status: 'unpaid' }).eq('id', p.id);
+          await supabaseClient.from('properties').update({ is_active: false }).eq('id', p.id);
           expiredCount++;
         }
       }
@@ -1727,7 +1711,6 @@ app.post('/api/admin/expire-listings', async (req, res) => {
         await sendSMS(landlord.phone, `NestList: Your property listing '${p.title}' has expired. It is no longer visible to tenants. Pay to reactivate.`, 'listing_expired');
       }
       p.is_active = false;
-      p.payment_status = 'unpaid';
       expiredCount++;
     }
 
