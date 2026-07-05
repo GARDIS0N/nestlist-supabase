@@ -21,11 +21,11 @@ export const Signup: React.FC = () => {
   const getPasswordStrength = (pwd: string) => {
     if (!pwd) return { label: "", color: "transparent", width: "0%" };
     if (pwd.length < 5) return { label: "Weak", color: "#DC2626", width: "25%" };
-    if (pwd.length < 8) return { label: "Fair", color: "#C9913A", width: "50%" };
+    if (pwd.length < 8) return { label: "Fair", color: "#D97706", width: "50%" };
     const hasNumbers = /\d/.test(pwd);
     const hasSpecial = /[!@#$%^&*(),.?":{}|<>]/.test(pwd);
     if (hasNumbers && hasSpecial) return { label: "Strong", color: "#1E6B4A", width: "100%" };
-    return { label: "Good", color: "#1E6B4A", width: "75%" };
+    return { label: "Good", color: "#F59E0B", width: "75%" };
   };
 
   const strength = getPasswordStrength(password);
@@ -91,7 +91,7 @@ export const Signup: React.FC = () => {
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#F2F4F0",
+    backgroundColor: "#FAFAF8",
     fontFamily: "system-ui, -apple-system, sans-serif",
     padding: "24px",
     boxSizing: "border-box",
@@ -100,43 +100,42 @@ export const Signup: React.FC = () => {
   const cardStyle: React.CSSProperties = {
     backgroundColor: "#FFFFFF",
     borderRadius: "20px",
-    border: "1px solid #E2E5DF",
+    border: "1px solid #E2EAE6",
     padding: "40px",
     width: "100%",
     maxWidth: "520px",
-    boxShadow: "0 10px 30px rgba(0,0,0,0.03)",
+    boxShadow: "0 10px 30px rgba(15,26,20,0.04)",
     textAlign: "center",
     boxSizing: "border-box",
   };
 
   const logoStyle: React.CSSProperties = {
-    fontSize: "36px",
-    fontWeight: "800",
-    color: "#1E6B4A",
-    marginBottom: "12px",
-    letterSpacing: "-0.04em",
     textDecoration: "none",
-    display: "inline-block",
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: "8px",
+    marginBottom: "16px",
   };
 
   const headingStyle: React.CSSProperties = {
     fontSize: "24px",
     fontWeight: "700",
-    color: "#1F2937",
+    color: "#0F1A14",
     margin: "0 0 6px 0",
     letterSpacing: "-0.02em",
   };
 
   const loginLinkStyle: React.CSSProperties = {
-    color: "#C9913A",
+    color: "#D97706",
     fontSize: "14px",
-    fontWeight: "600",
+    fontWeight: "700",
     textDecoration: "none",
   };
 
   const roleCardStyle = (selected: boolean): React.CSSProperties => ({
-    border: selected ? "2px solid #1E6B4A" : "2px solid #E2E5DF",
-    backgroundColor: selected ? "#F2F4F0" : "#FFFFFF",
+    border: selected ? "2px solid #1E6B4A" : "2px solid #E2EAE6",
+    backgroundColor: selected ? "#F0FDF4" : "#FFFFFF",
     borderRadius: "12px",
     padding: "12px",
     cursor: "pointer",
@@ -149,22 +148,23 @@ export const Signup: React.FC = () => {
     outline: "none",
     fontWeight: "700",
     fontSize: "14px",
-    color: "#1F2937",
+    color: "#0F1A14",
     boxSizing: "border-box",
+    boxShadow: selected ? "0 0 0 3px rgba(30,107,74,0.1)" : "none",
   });
 
   const labelStyle: React.CSSProperties = {
     display: "block",
     fontSize: "13px",
     fontWeight: "600",
-    color: "#4B5563",
+    color: "#4B5E54",
     marginBottom: "6px",
   };
 
   const inputStyle: React.CSSProperties = {
     width: "100%",
     padding: "12px 14px",
-    border: "1px solid #E2E5DF",
+    border: "1px solid #E2EAE6",
     borderRadius: "10px",
     fontSize: "14px",
     outline: "none",
@@ -173,10 +173,10 @@ export const Signup: React.FC = () => {
   };
 
   const buttonStyle: React.CSSProperties = {
-    backgroundColor: isFormValid ? "#1E6B4A" : "#D1D5DB",
+    background: isFormValid ? "linear-gradient(135deg,#1E6B4A,#2D9E6B)" : "#D1D5DB",
     color: "#FFFFFF",
     border: "none",
-    borderRadius: "10px",
+    borderRadius: "12px",
     padding: "14px 20px",
     fontSize: "16px",
     fontWeight: "600",
@@ -189,19 +189,25 @@ export const Signup: React.FC = () => {
     justifyContent: "center",
     alignItems: "center",
     fontFamily: "inherit",
+    boxShadow: isFormValid ? "0 4px 16px rgba(30,107,74,0.25)" : "none",
   };
 
   if (isSuccess) {
     return (
       <div style={containerStyle}>
         <div style={cardStyle}>
-          <div style={logoStyle}>Nestlist</div>
+          <div style={logoStyle}>
+            <div style={{ display: "flex", height: "36px", width: "36px", alignItems: "center", justifyContent: "center", borderRadius: "10px", background: "linear-gradient(135deg,#1E6B4A,#34D399)", color: "white", boxShadow: "0 8px 24px rgba(30,107,74,0.3)" }}>
+              <span style={{ fontSize: "18px", fontWeight: "950" }}>N</span>
+            </div>
+            <span style={{ color: "#0F1A14", fontWeight: "800", fontSize: "24px", letterSpacing: "-0.03em" }}>Nest<span style={{ color: "#1E6B4A" }}>list</span></span>
+          </div>
           <h1 style={{ ...headingStyle, color: "#1E6B4A", marginBottom: "16px" }}>Account created!</h1>
-          <p style={{ fontSize: "15px", color: "#4B5563", lineHeight: "1.6", marginBottom: "32px" }}>
-            We sent a confirmation to <strong style={{ color: "#1F2937" }}>{email}</strong>. <br />
+          <p style={{ fontSize: "15px", color: "#4B5E54", lineHeight: "1.6", marginBottom: "32px" }}>
+            We sent a confirmation to <strong style={{ color: "#0F1A14" }}>{email}</strong>. <br />
             Click the link in the email to verify your account.
           </p>
-          <Link to="/login" style={buttonStyle}>
+          <Link to="/login" style={buttonStyle} className="hover:brightness-95 active:scale-95 duration-150">
             Already confirmed? Sign in →
           </Link>
         </div>
@@ -211,11 +217,16 @@ export const Signup: React.FC = () => {
 
   return (
     <div style={containerStyle}>
-      <div style={cardStyle}>
-        <Link to="/" style={logoStyle}>Nestlist</Link>
+      <div style={cardStyle} className="animate-fade-in">
+        <Link to="/" style={logoStyle}>
+          <div style={{ display: "flex", height: "36px", width: "36px", alignItems: "center", justifyContent: "center", borderRadius: "10px", background: "linear-gradient(135deg,#1E6B4A,#34D399)", color: "white", boxShadow: "0 8px 24px rgba(30,107,74,0.3)" }} className="animate-float">
+            <span style={{ fontSize: "18px", fontWeight: "950" }}>N</span>
+          </div>
+          <span style={{ color: "#0F1A14", fontWeight: "800", fontSize: "24px", letterSpacing: "-0.03em" }}>Nest<span style={{ color: "#1E6B4A" }}>list</span></span>
+        </Link>
         <h1 style={headingStyle}>Create account</h1>
         <div style={{ marginBottom: "24px" }}>
-          <span style={{ fontSize: "14px", color: "#6B7280" }}>Already have one? </span>
+          <span style={{ fontSize: "14px", color: "#4B5E54" }}>Already have one? </span>
           <Link to="/login" style={loginLinkStyle}>Sign in →</Link>
         </div>
 
@@ -224,7 +235,7 @@ export const Signup: React.FC = () => {
             style={{
               backgroundColor: "#FEF2F2",
               color: "#DC2626",
-              border: "1px solid #FEE2E2",
+              border: "1px solid #FECACA",
               borderRadius: "10px",
               padding: "12px 14px",
               fontSize: "14px",
@@ -272,6 +283,7 @@ export const Signup: React.FC = () => {
                 placeholder="Peter Kamau"
                 required
                 style={inputStyle}
+                className="focus:border-[#1E6B4A] focus:ring-2 focus:ring-[#1E6B4A]/10 transition"
               />
             </div>
             <div style={{ flex: 1 }}>
@@ -286,6 +298,7 @@ export const Signup: React.FC = () => {
                 placeholder="0712345678"
                 required
                 style={inputStyle}
+                className="focus:border-[#1E6B4A] focus:ring-2 focus:ring-[#1E6B4A]/10 transition"
               />
             </div>
           </div>
@@ -303,6 +316,7 @@ export const Signup: React.FC = () => {
               placeholder="you@example.com"
               required
               style={inputStyle}
+              className="focus:border-[#1E6B4A] focus:ring-2 focus:ring-[#1E6B4A]/10 transition"
             />
           </div>
 
@@ -320,6 +334,7 @@ export const Signup: React.FC = () => {
                 placeholder="••••••••"
                 required
                 style={{ ...inputStyle, paddingRight: "44px" }}
+                className="focus:border-[#1E6B4A] focus:ring-2 focus:ring-[#1E6B4A]/10 transition"
               />
               <button
                 type="button"
@@ -332,7 +347,7 @@ export const Signup: React.FC = () => {
                   background: "none",
                   border: "none",
                   cursor: "pointer",
-                  color: "#9CA3AF",
+                  color: "#8A9E94",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
@@ -346,11 +361,11 @@ export const Signup: React.FC = () => {
             {/* Password strength meter */}
             {password && (
               <div style={{ marginTop: "10px" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px" }}>
-                  <span style={{ fontSize: "11px", fontWeight: "600", color: "#6B7280" }}>Password Strength:</span>
+                <div style={{ display: "flex", justifyContents: "space-between", alignItems: "center", marginBottom: "4px" }}>
+                  <span style={{ fontSize: "11px", fontWeight: "600", color: "#4B5E54" }}>Password Strength:</span>
                   <span style={{ fontSize: "11px", fontWeight: "700", color: strength.color }}>{strength.label}</span>
                 </div>
-                <div style={{ width: "100%", height: "5px", backgroundColor: "#E5E7EB", borderRadius: "5px", overflow: "hidden" }}>
+                <div style={{ width: "100%", height: "5px", backgroundColor: "#E2EAE6", borderRadius: "5px", overflow: "hidden" }}>
                   <div style={{ width: strength.width, height: "100%", backgroundColor: strength.color, transition: "width 0.3s ease" }} />
                 </div>
                 {password.length < 8 && (
@@ -362,18 +377,18 @@ export const Signup: React.FC = () => {
             )}
           </div>
 
-          <button type="submit" disabled={!isFormValid || loading} style={buttonStyle}>
+          <button type="submit" disabled={!isFormValid || loading} style={buttonStyle} className="hover:brightness-95 active:scale-95 duration-150">
             {loading ? "Creating..." : `Create ${role === "tenant" ? "Tenant" : "Landlord"} account →`}
           </button>
         </form>
 
-        <div style={{ marginTop: "24px", textAlign: "center", fontSize: "12px", color: "#6B7280", lineHeight: "1.5" }}>
+        <div style={{ marginTop: "24px", textAlign: "center", fontSize: "12px", color: "#4B5E54", lineHeight: "1.5" }}>
           By creating an account you agree to our{" "}
-          <Link to="#" style={{ color: "#4B5563", fontWeight: "600", textDecoration: "underline" }}>
+          <Link to="#" style={{ color: "#4B5E54", fontWeight: "600", textDecoration: "underline" }}>
             Terms of Service
           </Link>{" "}
           and{" "}
-          <Link to="/privacy" style={{ color: "#1E6B4A", fontWeight: "700", textDecoration: "underline" }}>
+          <Link to="/privacy" style={{ color: "#1E6B4A", fontWeight: "750", textDecoration: "underline" }}>
             Privacy Policy
           </Link>.
         </div>

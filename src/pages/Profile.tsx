@@ -163,7 +163,7 @@ export const Profile: React.FC = () => {
   if (!profile) {
     return (
       <div className="max-w-4xl mx-auto py-12 px-4 text-center">
-        <Loader2 className="h-8 w-8 animate-spin text-amber-600 mx-auto mb-4" />
+        <Loader2 className="h-8 w-8 animate-spin text-primary-600 mx-auto mb-4" />
         <p className="text-stone-600 font-medium">Loading user profile details...</p>
       </div>
     );
@@ -184,11 +184,11 @@ export const Profile: React.FC = () => {
             <img 
               src={profile.avatar_url} 
               alt={profile.full_name || "Profile"} 
-              className="h-16 w-16 rounded-full object-cover border-2 border-amber-500/20 shadow-sm"
+              className="h-16 w-16 rounded-full object-cover border-2 border-primary-500/20 shadow-sm"
               referrerPolicy="no-referrer"
             />
           ) : (
-            <div className="h-16 w-16 rounded-full bg-amber-50 border border-amber-200 flex items-center justify-center text-amber-700">
+            <div className="h-16 w-16 rounded-full bg-primary-50 border border-primary-200 flex items-center justify-center text-primary-700">
               <User className="h-8 w-8" />
             </div>
           )}
@@ -197,8 +197,8 @@ export const Profile: React.FC = () => {
               {profile.full_name || "NestList User"}
             </h1>
             <div className="flex items-center gap-1.5 mt-1">
-              <Shield className="h-3.5 w-3.5 text-amber-600" />
-              <span className="text-xs font-semibold text-amber-800 uppercase tracking-wider bg-amber-50 px-2.5 py-0.5 rounded-full border border-amber-200/40">
+              <Shield className="h-3.5 w-3.5 text-primary-600" />
+              <span className="text-xs font-semibold text-primary-800 uppercase tracking-wider bg-primary-50 px-2.5 py-0.5 rounded-full border border-primary-200/40">
                 {roleLabels[profile.role || "tenant"] || "Tenant"}
               </span>
             </div>
@@ -250,7 +250,7 @@ export const Profile: React.FC = () => {
                       value={fullName}
                       onChange={(e) => setFullName(e.target.value)}
                       placeholder="e.g. Kelvin Mutua"
-                      className="w-full pl-9 pr-4 py-2 text-sm bg-stone-50/50 border border-stone-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all font-medium text-stone-800"
+                      className="w-full pl-9 pr-4 py-2 text-sm bg-stone-50/50 border border-stone-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#1E6B4A]/20 focus:border-[#1E6B4A] transition-all font-medium text-stone-800"
                     />
                   </div>
                 </div>
@@ -266,7 +266,7 @@ export const Profile: React.FC = () => {
                       value={phone}
                       onChange={(e) => setPhone(e.target.value)}
                       placeholder="e.g. +254 712 345678"
-                      className="w-full pl-9 pr-4 py-2 text-sm bg-stone-50/50 border border-stone-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all font-medium text-stone-800"
+                      className="w-full pl-9 pr-4 py-2 text-sm bg-stone-50/50 border border-stone-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#1E6B4A]/20 focus:border-[#1E6B4A] transition-all font-medium text-stone-800"
                     />
                   </div>
                 </div>
@@ -315,7 +315,7 @@ export const Profile: React.FC = () => {
           {/* Section 2: Update Password Form */}
           <div className="bg-white border border-stone-200/80 rounded-2xl shadow-sm p-6" id="profile-password-change">
             <div className="flex items-center gap-2 mb-5 pb-3 border-b border-stone-100">
-              <Lock className="h-5 w-5 text-amber-700" />
+              <Lock className="h-5 w-5 text-primary-700" />
               <h2 className="text-base font-bold text-stone-900">Security & Password</h2>
             </div>
 
@@ -346,7 +346,7 @@ export const Profile: React.FC = () => {
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       placeholder="Minimum 6 characters"
-                      className="w-full pl-9 pr-4 py-2 text-sm bg-stone-50/50 border border-stone-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all font-medium text-stone-800"
+                      className="w-full pl-9 pr-4 py-2 text-sm bg-stone-50/50 border border-stone-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#1E6B4A]/20 focus:border-[#1E6B4A] transition-all font-medium text-stone-800"
                     />
                   </div>
                 </div>
@@ -362,7 +362,7 @@ export const Profile: React.FC = () => {
                       value={confirmPassword}
                       onChange={(e) => setConfirmPassword(e.target.value)}
                       placeholder="Repeat new password"
-                      className="w-full pl-9 pr-4 py-2 text-sm bg-stone-50/50 border border-stone-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all font-medium text-stone-800"
+                      className="w-full pl-9 pr-4 py-2 text-sm bg-stone-50/50 border border-stone-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#1E6B4A]/20 focus:border-[#1E6B4A] transition-all font-medium text-stone-800"
                     />
                   </div>
                 </div>
@@ -398,7 +398,7 @@ export const Profile: React.FC = () => {
           {/* Section 3: Notification Preferences */}
           <div className="bg-white border border-stone-200/80 rounded-2xl shadow-sm p-6" id="profile-notification-preferences">
             <div className="flex items-center gap-2 mb-4 pb-3 border-b border-stone-100">
-              <Bell className="h-5 w-5 text-amber-600" />
+              <Bell className="h-5 w-5 text-primary-600" />
               <h2 className="text-base font-bold text-stone-900">Notifications</h2>
             </div>
 
@@ -474,7 +474,7 @@ export const Profile: React.FC = () => {
 
           {/* Quick Help Card */}
           <div className="bg-gradient-to-br from-stone-900 to-stone-850 text-white rounded-2xl p-5 shadow-md">
-            <h3 className="text-sm font-bold tracking-tight mb-2 flex items-center gap-1.5 text-amber-400">
+            <h3 className="text-sm font-bold tracking-tight mb-2 flex items-center gap-1.5 text-gold-400">
               <Shield className="h-4 w-4" />
               Need Assistance?
             </h3>
@@ -483,7 +483,7 @@ export const Profile: React.FC = () => {
             </p>
             <div className="border-t border-stone-800 pt-3 flex items-center justify-between text-[11px] font-semibold text-stone-300">
               <span>Support Email</span>
-              <a href="mailto:support@nestlist.co.ke" className="text-amber-400 hover:underline">
+              <a href="mailto:support@nestlist.co.ke" className="text-gold-400 hover:underline">
                 support@nestlist.co.ke
               </a>
             </div>

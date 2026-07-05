@@ -252,7 +252,7 @@ export const ListProperty: React.FC = () => {
               <div
                 className={`h-7 w-7 rounded-full text-xs font-bold flex items-center justify-center transition-colors ${
                   step === s
-                    ? "bg-amber-600 text-white"
+                    ? "bg-primary-600 text-white"
                     : step > s
                     ? "bg-emerald-100 text-emerald-800"
                     : "bg-stone-200 text-stone-500"
@@ -273,7 +273,7 @@ export const ListProperty: React.FC = () => {
       {step === 1 && (
         <div className="space-y-5 bg-white p-6 rounded-2xl border border-stone-200 shadow-sm">
           <h2 className="text-xl font-bold font-sans text-stone-900 flex items-center space-x-1.5">
-            <Building className="h-5.5 w-5.5 text-amber-600" />
+            <Building className="h-5.5 w-5.5 text-primary-600" />
             <span>Step 1: Property Details</span>
           </h2>
 
@@ -369,7 +369,7 @@ export const ListProperty: React.FC = () => {
                     placeholder="e.g. Roysambu, Behind TRM Mall"
                     value={locationName}
                     onChange={(e) => setLocationName(e.target.value)}
-                    className="w-full pl-10 pr-4 py-2.5 border border-stone-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
+                    className="w-full pl-10 pr-4 py-2.5 border border-stone-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                     required
                   />
                 </div>
@@ -380,7 +380,7 @@ export const ListProperty: React.FC = () => {
           <div className="flex justify-end pt-3">
             <button
               onClick={handleNextStep}
-              className="py-2.5 px-6 bg-amber-600 hover:bg-amber-700 text-white rounded-xl font-bold text-sm flex items-center space-x-1 shadow transition"
+              className="py-2.5 px-6 bg-primary-600 hover:bg-primary-700 text-white rounded-xl font-bold text-sm flex items-center space-x-1 shadow transition"
             >
               <span>Continue</span>
               <ChevronRight className="h-4 w-4" />
@@ -393,7 +393,7 @@ export const ListProperty: React.FC = () => {
       {step === 2 && (
         <div className="space-y-5 bg-white p-6 rounded-2xl border border-stone-200 shadow-sm">
           <h2 className="text-xl font-bold font-sans text-stone-900 flex items-center space-x-1.5">
-            <CheckSquare className="h-5.5 w-5.5 text-amber-600" />
+            <CheckSquare className="h-5.5 w-5.5 text-primary-600" />
             <span>Step 2: Amenities Checklist</span>
           </h2>
 
@@ -410,12 +410,12 @@ export const ListProperty: React.FC = () => {
                   onClick={() => handleToggleAmenity(amenity)}
                   className={`py-2.5 px-3 rounded-xl border text-left text-xs font-bold transition flex items-center space-x-2 ${
                     isChecked
-                      ? "bg-amber-100 border-amber-300 text-amber-900"
+                      ? "bg-gold-100 border-gold-300/40 text-gold-900"
                       : "bg-white border-stone-200 text-stone-600 hover:bg-stone-50"
                   }`}
                 >
                   <div className={`h-4.5 w-4.5 rounded flex items-center justify-center border transition ${
-                    isChecked ? "bg-amber-600 border-amber-600 text-white" : "border-stone-300 bg-white"
+                    isChecked ? "bg-primary-600 border-primary-600 text-white" : "border-stone-300 bg-white"
                   }`}>
                     {isChecked && <Check className="h-3 w-3 stroke-[3]" />}
                   </div>
@@ -435,7 +435,7 @@ export const ListProperty: React.FC = () => {
             </button>
             <button
               onClick={handleNextStep}
-              className="py-2.5 px-6 bg-amber-600 hover:bg-amber-700 text-white rounded-xl font-bold text-sm flex items-center space-x-1 shadow transition"
+              className="py-2.5 px-6 bg-primary-600 hover:bg-primary-700 text-white rounded-xl font-bold text-sm flex items-center space-x-1 shadow transition"
             >
               <span>Continue</span>
               <ChevronRight className="h-4 w-4" />
@@ -448,7 +448,7 @@ export const ListProperty: React.FC = () => {
       {step === 3 && (
         <div className="space-y-5 bg-white p-6 rounded-2xl border border-stone-200 shadow-sm">
           <h2 className="text-xl font-bold font-sans text-stone-900 flex items-center space-x-1.5">
-            <Sparkles className="h-5.5 w-5.5 text-amber-600" />
+            <Sparkles className="h-5.5 w-5.5 text-primary-600" />
             <span>Step 3: Property Images</span>
           </h2>
 
@@ -464,7 +464,7 @@ export const ListProperty: React.FC = () => {
             </button>
             <button
               onClick={handleNextStep}
-              className="py-2.5 px-6 bg-amber-600 hover:bg-amber-700 text-white rounded-xl font-bold text-sm flex items-center space-x-1 shadow transition"
+              className="py-2.5 px-6 bg-primary-600 hover:bg-primary-700 text-white rounded-xl font-bold text-sm flex items-center space-x-1 shadow transition"
             >
               <span>Continue</span>
               <ChevronRight className="h-4 w-4" />
@@ -477,7 +477,7 @@ export const ListProperty: React.FC = () => {
       {step === 4 && (
         <div className="space-y-6 bg-white p-6 rounded-2xl border border-stone-200 shadow-sm">
           <h2 className="text-xl font-bold font-sans text-stone-900 flex items-center space-x-1.5">
-            <ShieldCheck className="h-5.5 w-5.5 text-amber-600" />
+            <ShieldCheck className="h-5.5 w-5.5 text-primary-600" />
             <span>Step 4: Review Summary</span>
           </h2>
 
@@ -503,7 +503,7 @@ export const ListProperty: React.FC = () => {
               </div>
               <div>
                 <p className="text-[10px] text-stone-400 font-bold uppercase tracking-wider">Safaricom Invoice Fee</p>
-                <p className="font-black text-amber-700 font-mono">KSh {getListingFee(selectedType)}</p>
+                <p className="font-black text-gold-700 font-mono">KSh {getListingFee(selectedType)}</p>
               </div>
             </div>
           </div>
@@ -531,7 +531,7 @@ export const ListProperty: React.FC = () => {
       {step === 5 && (
         <div className="space-y-6 bg-white p-8 rounded-2xl border border-stone-200 shadow-xl relative overflow-hidden">
           {/* Cover glow */}
-          <div className="absolute top-0 right-0 h-48 w-48 bg-amber-500/5 rounded-full blur-2xl"></div>
+          <div className="absolute top-0 right-0 h-48 w-48 bg-gold-500/5 rounded-full blur-2xl"></div>
 
           {paymentStatus === "verified" ? (
             /* CONGRATULATIONS / VERIFIED PAGE */
@@ -565,7 +565,7 @@ export const ListProperty: React.FC = () => {
           ) : paymentStatus === "pending_verification" ? (
             /* PENDING REVIEW PAGE */
             <div className="text-center py-6 space-y-5 animate-fade-in">
-              <div className="mx-auto h-16 w-16 bg-amber-50 text-amber-600 border-2 border-amber-300 rounded-full flex items-center justify-center shadow-lg animate-pulse">
+              <div className="mx-auto h-16 w-16 bg-gold-50 text-gold-600 border-2 border-gold-300/40 rounded-full flex items-center justify-center shadow-lg animate-pulse">
                 <Clock className="h-9 w-9" />
               </div>
 
@@ -654,14 +654,14 @@ export const ListProperty: React.FC = () => {
               </div>
 
               {/* PAYBILL INSTRUCTIONS PANEL */}
-              <div className="bg-amber-50/40 rounded-xl border border-amber-150 p-5 space-y-4">
+              <div className="bg-gold-50/20 rounded-xl border border-gold-200/30 p-5 space-y-4">
                 <h3 className="text-stone-900 font-extrabold text-xs uppercase tracking-wider">M-Pesa Payment Steps:</h3>
                 <div className="grid grid-cols-2 gap-4 pb-1">
-                  <div className="bg-white border border-amber-200/60 p-3 rounded-lg text-center">
+                  <div className="bg-white border border-gold-200/40 p-3 rounded-lg text-center">
                     <p className="text-[10px] text-stone-400 uppercase font-bold">Paybill Number</p>
-                    <p className="text-lg font-mono font-black text-amber-900">247247</p>
+                    <p className="text-lg font-mono font-black text-gold-950">247247</p>
                   </div>
-                  <div className="bg-white border border-amber-200/60 p-3 rounded-lg text-center">
+                  <div className="bg-white border border-gold-200/40 p-3 rounded-lg text-center">
                     <p className="text-[10px] text-stone-400 uppercase font-bold">Account Number</p>
                     <p className="text-sm font-mono font-extrabold text-stone-950 truncate">0715185037</p>
                   </div>
@@ -697,7 +697,7 @@ export const ListProperty: React.FC = () => {
                       onChange={(e) => setMpesaCode(e.target.value)}
                       placeholder="e.g. QBG582Y78X"
                       maxLength={12}
-                      className="w-full pl-10 pr-4 py-3 border border-stone-300 rounded-xl text-sm font-mono uppercase focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
+                      className="w-full pl-10 pr-4 py-3 border border-stone-300 rounded-xl text-sm font-mono uppercase focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                       required
                     />
                   </div>
@@ -717,7 +717,7 @@ export const ListProperty: React.FC = () => {
                       value={mpesaPhone}
                       onChange={(e) => setMpesaPhone(e.target.value)}
                       placeholder="e.g. 0715185037"
-                      className="w-full pl-10 pr-4 py-3 border border-stone-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
+                      className="w-full pl-10 pr-4 py-3 border border-stone-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                     />
                   </div>
                   <p className="text-[10px] text-stone-400">

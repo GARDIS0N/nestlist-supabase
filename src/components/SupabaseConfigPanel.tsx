@@ -142,7 +142,7 @@ CREATE POLICY update_profiles_policy ON public.profiles FOR UPDATE USING (auth.u
         className="flex items-center justify-between p-4 bg-white border-b border-stone-100 cursor-pointer select-none hover:bg-stone-50/50 transition-colors"
       >
         <div className="flex items-center space-x-3">
-          <div className={`p-2 rounded-xl ${config.isMock ? "bg-amber-50 text-amber-600" : "bg-emerald-50 text-emerald-600"}`}>
+          <div className={`p-2 rounded-xl ${config.isMock ? "bg-[#FEF3C7] text-[#92400E]" : "bg-emerald-50 text-emerald-600"}`}>
             <Database className="h-5 w-5" />
           </div>
           <div>
@@ -152,7 +152,7 @@ CREATE POLICY update_profiles_policy ON public.profiles FOR UPDATE USING (auth.u
               </h4>
               <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold ${
                 config.isMock 
-                  ? "bg-amber-100/70 text-amber-800" 
+                  ? "bg-gold-100 text-gold-800 border border-gold-200/30" 
                   : "bg-emerald-100/70 text-emerald-800"
               }`}>
                 {config.isMock ? "Simulator Mode (Mock)" : "Live Connected"}
@@ -166,7 +166,7 @@ CREATE POLICY update_profiles_policy ON public.profiles FOR UPDATE USING (auth.u
             </p>
           </div>
         </div>
-        <button className="text-xs font-bold text-amber-700 hover:text-amber-800 transition">
+        <button className="text-xs font-bold text-primary-600 hover:text-primary-700 transition">
           {isExpanded ? "Collapse Settings" : "Configure Connection"}
         </button>
       </div>
@@ -197,7 +197,7 @@ CREATE POLICY update_profiles_policy ON public.profiles FOR UPDATE USING (auth.u
                     value={url}
                     onChange={(e) => setUrl(e.target.value)}
                     placeholder="https://your-project-id.supabase.co"
-                    className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-stone-300 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500 text-xs sm:text-sm font-medium"
+                    className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-stone-300 focus:outline-none focus:ring-2 focus:ring-[#1E6B4A]/10 focus:border-[#1E6B4A] text-xs sm:text-sm font-medium"
                     required
                     disabled={!config.isMock && config.isUsingStored}
                   />
@@ -216,7 +216,7 @@ CREATE POLICY update_profiles_policy ON public.profiles FOR UPDATE USING (auth.u
                     value={anonKey}
                     onChange={(e) => setAnonKey(e.target.value)}
                     placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
-                    className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-stone-300 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500 text-xs sm:text-sm font-mono"
+                    className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-stone-300 focus:outline-none focus:ring-2 focus:ring-[#1E6B4A]/10 focus:border-[#1E6B4A] text-xs sm:text-sm font-mono"
                     required
                     disabled={!config.isMock && config.isUsingStored}
                   />
@@ -229,13 +229,13 @@ CREATE POLICY update_profiles_policy ON public.profiles FOR UPDATE USING (auth.u
               <div className={`p-4 rounded-xl border text-xs sm:text-sm flex items-start space-x-3 font-medium leading-relaxed ${
                 testResult.success 
                   ? testResult.migrationNeeded 
-                    ? "bg-amber-50 border-amber-200/80 text-amber-800" 
+                    ? "bg-[#FEF3C7] border-[#FDE68A] text-[#92400E]" 
                     : "bg-emerald-50 border-emerald-200/80 text-emerald-800"
                   : "bg-red-50 border-red-200/80 text-red-800"
               }`}>
                 {testResult.success ? (
                   testResult.migrationNeeded ? (
-                    <AlertCircle className="h-5 w-5 text-amber-500 shrink-0" />
+                    <AlertCircle className="h-5 w-5 text-[#D97706] shrink-0" />
                   ) : (
                     <CheckCircle2 className="h-5 w-5 text-emerald-500 shrink-0" />
                   )
@@ -248,7 +248,7 @@ CREATE POLICY update_profiles_policy ON public.profiles FOR UPDATE USING (auth.u
                     <button
                       type="button"
                       onClick={() => setShowSql(!showSql)}
-                      className="text-xs font-bold text-amber-900 underline hover:text-amber-950 transition block mt-1"
+                      className="text-xs font-bold text-[#92400E] underline hover:text-black transition block mt-1"
                     >
                       {showSql ? "Hide SQL Migration Instructions" : "View SQL Migration Instructions"}
                     </button>
@@ -259,15 +259,15 @@ CREATE POLICY update_profiles_policy ON public.profiles FOR UPDATE USING (auth.u
 
             {/* SQL Migration Script Box */}
             {showSql && (
-              <div className="border border-amber-200 bg-amber-50/20 rounded-xl p-4 space-y-3">
+              <div className="border border-[#FDE68A] bg-[#FEF3C7]/20 rounded-xl p-4 space-y-3">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-amber-900 flex items-center gap-1.5">
+                  <span className="text-xs font-bold text-[#92400E] flex items-center gap-1.5">
                     <FileText className="h-4 w-4" /> Quick Table Setup SQL
                   </span>
                   <button
                     type="button"
                     onClick={handleCopySql}
-                    className="flex items-center gap-1 py-1 px-2 bg-white rounded-lg border border-amber-200 text-[11px] font-bold hover:bg-amber-50 transition text-amber-800"
+                    className="flex items-center gap-1 py-1 px-2 bg-white rounded-lg border border-[#FDE68A] text-[11px] font-bold hover:bg-[#FEF3C7] transition text-[#92400E]"
                   >
                     {copied ? (
                       <>
@@ -281,7 +281,7 @@ CREATE POLICY update_profiles_policy ON public.profiles FOR UPDATE USING (auth.u
                   </button>
                 </div>
                 <p className="text-[11px] text-stone-500 leading-relaxed">
-                  Go to your <a href="https://supabase.com/dashboard" target="_blank" rel="noopener noreferrer" className="font-bold underline text-amber-800 inline-flex items-center gap-0.5">Supabase Dashboard <ExternalLink className="h-2.5 w-2.5" /></a>, select your project, go to the <strong>SQL Editor</strong> tab, click <strong>New Query</strong>, paste the copied code below, and click <strong>Run</strong>.
+                  Go to your <a href="https://supabase.com/dashboard" target="_blank" rel="noopener noreferrer" className="font-bold underline text-[#92400E] inline-flex items-center gap-0.5">Supabase Dashboard <ExternalLink className="h-2.5 w-2.5" /></a>, select your project, go to the <strong>SQL Editor</strong> tab, click <strong>New Query</strong>, paste the copied code below, and click <strong>Run</strong>.
                 </p>
                 <pre className="text-[10px] font-mono bg-stone-900 text-stone-100 p-3 rounded-lg overflow-x-auto max-h-48 leading-relaxed">
 {`-- Create Profiles table matching auth.users
@@ -311,7 +311,7 @@ CREATE POLICY update_profiles_policy ON public.profiles FOR UPDATE USING (auth.u
                 <button
                   type="submit"
                   disabled={testing}
-                  className="px-5 py-2.5 bg-amber-600 hover:bg-amber-700 text-white text-xs sm:text-sm font-bold rounded-xl shadow-md shadow-amber-600/10 hover:shadow-lg transition flex items-center gap-2 disabled:opacity-50"
+                  className="px-5 py-2.5 bg-primary-600 hover:bg-primary-700 text-white text-xs sm:text-sm font-bold rounded-xl shadow-md shadow-primary-600/10 hover:shadow-lg transition flex items-center gap-2 disabled:opacity-50"
                 >
                   {testing ? (
                     <>
@@ -351,7 +351,7 @@ CREATE POLICY update_profiles_policy ON public.profiles FOR UPDATE USING (auth.u
               href="https://supabase.com" 
               target="_blank" 
               rel="noopener noreferrer"
-              className="font-bold text-amber-700 hover:text-amber-800 inline-flex items-center gap-0.5"
+              className="font-bold text-primary-600 hover:text-primary-700 inline-flex items-center gap-0.5"
             >
               Go to Supabase Dashboard <ExternalLink className="h-3 w-3" />
             </a>

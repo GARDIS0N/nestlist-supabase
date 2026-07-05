@@ -85,7 +85,7 @@ export const SavedProperties: React.FC = () => {
       {loading ? (
         <div className="flex justify-center items-center py-20">
           <div className="flex flex-col items-center space-y-3">
-            <Loader2 className="h-8 w-8 text-amber-600 animate-spin" />
+            <Loader2 className="h-8 w-8 text-primary-600 animate-spin" />
             <p className="text-stone-400 font-medium text-xs">Loading saved listings...</p>
           </div>
         </div>
@@ -126,7 +126,7 @@ export const SavedProperties: React.FC = () => {
                   }}
                 />
 
-                <span className="absolute top-3 left-3 bg-stone-900/80 backdrop-blur-sm text-amber-400 text-[10px] font-bold uppercase px-2 py-1 rounded-full border border-stone-700">
+                <span className="absolute top-3 left-3 bg-stone-900/80 backdrop-blur-sm text-gold-400 text-[10px] font-bold uppercase px-2 py-1 rounded-full border border-stone-700">
                   {property.type.replace("_", " ")}
                 </span>
 
@@ -142,11 +142,11 @@ export const SavedProperties: React.FC = () => {
               {/* Details */}
               <div className="p-5 flex flex-col flex-1 space-y-2">
                 <div className="flex items-center space-x-1 text-stone-400 text-xs font-semibold">
-                  <MapPin className="h-3.5 w-3.5 text-amber-600 shrink-0" />
+                  <MapPin className="h-3.5 w-3.5 text-primary-600 shrink-0" />
                   <span className="truncate">{property.location}, {property.county}</span>
                 </div>
 
-                <h3 className="font-sans font-bold text-stone-950 text-base line-clamp-1 group-hover:text-amber-800 transition-colors">
+                <h3 className="font-sans font-bold text-stone-950 text-base line-clamp-1 group-hover:text-primary-800 transition-colors">
                   {property.title}
                 </h3>
 
@@ -157,7 +157,7 @@ export const SavedProperties: React.FC = () => {
                     </span>
                     <span className="text-xs text-stone-500"> / Month</span>
                   </div>
-                  <span className="text-xs font-bold text-amber-700 group-hover:underline">
+                  <span className="text-xs font-bold text-primary-600 group-hover:underline">
                     View →
                   </span>
                 </div>

@@ -215,7 +215,7 @@ export const Privacy: React.FC = () => {
                         <p>• M-Pesa receipt verification code (e.g. QBG582Y78X).</p>
                         <p>• Mobile number used to perform the transaction.</p>
                         <p>• Amount paid in KES for the listing activation fee.</p>
-                        <p className="mt-2 text-xs text-amber-700 font-medium bg-amber-50 p-2 rounded-lg border border-amber-100">
+                        <p className="mt-2 text-xs text-[#92400E] font-medium bg-[#FEF3C7] p-2 rounded-lg border border-[#FDE68A]">
                           ⚠️ NOTE: We do NOT store your M-Pesa PIN, nor do we have any access to your private M-Pesa balance. We only check the specific receipt code you share with us.
                         </p>
                       </div>

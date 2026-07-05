@@ -215,7 +215,7 @@ export const AdminPanel: React.FC = () => {
           id="admin-toast-message"
         >
           {toast.type === "success" && <CheckCircle2 className="h-4.5 w-4.5 text-emerald-600 shrink-0" />}
-          {toast.type === "info" && <AlertCircle className="h-4.5 w-4.5 text-amber-500 shrink-0" />}
+          {toast.type === "info" && <AlertCircle className="h-4.5 w-4.5 text-gold-500 shrink-0" />}
           {toast.type === "error" && <AlertCircle className="h-4.5 w-4.5 text-rose-600 shrink-0" />}
           <p className="font-semibold">{toast.message}</p>
         </div>
@@ -225,7 +225,7 @@ export const AdminPanel: React.FC = () => {
       <div className="bg-white border border-stone-200/80 rounded-2xl p-6 mb-8 shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2">
-            <div className="p-1.5 bg-amber-50 text-amber-800 rounded-lg border border-amber-200/50">
+            <div className="p-1.5 bg-primary-50 text-primary-800 rounded-lg border border-primary-200/50">
               <Shield className="h-5 w-5" />
             </div>
             <h1 className="text-xl font-bold text-stone-900 tracking-tight">Nestlist Admin Hub</h1>
@@ -241,7 +241,7 @@ export const AdminPanel: React.FC = () => {
           className="flex items-center gap-1.5 border border-stone-200 hover:bg-stone-50 text-stone-600 hover:text-stone-900 font-medium text-xs py-2 px-4 rounded-full transition active:scale-95 cursor-pointer shrink-0 disabled:opacity-45"
           id="admin-global-refresh-btn"
         >
-          <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin text-amber-600" : ""}`} />
+          <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin text-primary-600" : ""}`} />
           <span>Refresh Data</span>
         </button>
       </div>
@@ -332,8 +332,8 @@ export const AdminPanel: React.FC = () => {
                       id={`payment-card-${payment.id}`}
                     >
                       {/* Card Top Banner / Status Indicator */}
-                      <div className="bg-amber-500/5 px-4 py-3 border-b border-stone-100 flex items-center justify-between">
-                        <span className="text-[10px] font-bold uppercase tracking-wider text-amber-800 bg-amber-50 border border-amber-200/40 py-0.5 px-2 rounded-full">
+                      <div className="bg-gold-500/5 px-4 py-3 border-b border-stone-100 flex items-center justify-between">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-gold-850 bg-gold-50 border border-gold-200/40 py-0.5 px-2 rounded-full">
                           M-Pesa Verification Needed
                         </span>
                         <span className="text-[10px] text-stone-400 font-semibold font-mono">
@@ -547,7 +547,7 @@ export const AdminPanel: React.FC = () => {
                           <td className="p-4">
                             <span className={`inline-block text-[10px] font-bold uppercase px-2.5 py-0.5 rounded-full ${
                               user.role === "admin"
-                                ? "bg-amber-100 text-amber-900 border border-amber-200/40"
+                                ? "bg-gold-100 text-gold-900 border border-gold-200/40"
                                 : user.role === "landlord"
                                 ? "bg-emerald-50 text-emerald-850 border border-emerald-100"
                                 : "bg-blue-50 text-blue-800 border border-blue-100"

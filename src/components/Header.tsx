@@ -25,8 +25,8 @@ export const Header: React.FC = () => {
   const linkStyle = (path: string) => {
     return `flex items-center space-x-1.5 py-2 px-3 rounded-lg text-sm font-medium transition-all ${
       isActive(path)
-        ? "bg-amber-100/70 text-amber-900"
-        : "text-stone-600 hover:text-amber-800 hover:bg-stone-100"
+        ? "bg-primary-50 text-primary-800"
+        : "text-stone-600 hover:text-primary-800 hover:bg-stone-100"
     }`;
   };
 
@@ -37,12 +37,12 @@ export const Header: React.FC = () => {
           
           {/* Logo */}
           <Link to="/" className="flex items-center space-x-2">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-tr from-amber-600 to-amber-500 text-white shadow-md shadow-amber-600/10">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-tr from-primary-600 to-primary-400 text-white shadow-md shadow-primary-600/10">
               <span className="font-sans text-xl font-black tracking-tighter">N</span>
             </div>
             <div>
               <span className="font-sans text-lg font-bold tracking-tight text-stone-900">
-                Nest<span className="text-amber-600">list</span>
+                Nest<span className="text-primary-600">list</span>
               </span>
               <span className="block text-[10px] font-medium text-stone-400 -mt-1 tracking-wider uppercase">
                 Kenyan Rentals
@@ -65,7 +65,7 @@ export const Header: React.FC = () => {
                     <span>Saved</span>
                   </Link>
                   <Link to="/alerts" className={linkStyle("/alerts")}>
-                    <Bell className="h-4 w-4 text-amber-600" />
+                    <Bell className="h-4 w-4 text-primary-600" />
                     <span>Alerts</span>
                   </Link>
                 </>
@@ -96,7 +96,7 @@ export const Header: React.FC = () => {
                   </p>
                   <Link
                     to="/profile"
-                    className="text-[10px] font-bold text-amber-600 hover:text-amber-700 hover:underline block text-right mt-0.5"
+                    className="text-[10px] font-bold text-primary-600 hover:text-primary-700 hover:underline block text-right mt-0.5"
                   >
                     View Profile
                   </Link>
@@ -104,13 +104,13 @@ export const Header: React.FC = () => {
                 <Link to="/profile" title="View Profile">
                   {profile.avatar_url ? (
                     <img
-                      src={profile.avatar_url}
+                       src={profile.avatar_url}
                       alt={profile.full_name}
-                      className="h-9 w-9 rounded-full object-cover border border-stone-200 shadow-sm hover:ring-2 hover:ring-amber-500 transition-all"
+                      className="h-9 w-9 rounded-full object-cover border border-stone-200 shadow-sm hover:ring-2 hover:ring-primary-500 transition-all"
                       referrerPolicy="no-referrer"
                     />
                   ) : (
-                    <div className="flex h-9 w-9 items-center justify-center rounded-full bg-stone-100 text-stone-600 border border-stone-200 hover:border-amber-500 transition-all">
+                    <div className="flex h-9 w-9 items-center justify-center rounded-full bg-stone-100 text-stone-600 border border-stone-200 hover:border-primary-500 transition-all">
                       <User className="h-4 w-4" />
                     </div>
                   )}
@@ -133,7 +133,7 @@ export const Header: React.FC = () => {
                 </Link>
                 <Link
                   to="/signup"
-                  className="text-sm font-medium bg-amber-600 text-white hover:bg-amber-700 px-4 py-2 rounded-lg shadow-sm"
+                  className="text-sm font-medium bg-primary-600 text-white hover:bg-primary-700 px-4 py-2 rounded-lg shadow-sm"
                 >
                   Register
                 </Link>
@@ -161,7 +161,7 @@ export const Header: React.FC = () => {
             to="/"
             onClick={() => setMobileMenuOpen(false)}
             className={`flex items-center space-x-2 p-3 rounded-lg text-base font-medium ${
-              isActive("/") ? "bg-amber-100 text-amber-900" : "text-stone-700"
+              isActive("/") ? "bg-primary-50 text-primary-900" : "text-stone-700"
             }`}
           >
             <Home className="h-5 w-5" />
@@ -174,7 +174,7 @@ export const Header: React.FC = () => {
                 to="/saved"
                 onClick={() => setMobileMenuOpen(false)}
                 className={`flex items-center space-x-2 p-3 rounded-lg text-base font-medium ${
-                  isActive("/saved") ? "bg-amber-100 text-amber-900" : "text-stone-700"
+                  isActive("/saved") ? "bg-primary-50 text-primary-900" : "text-stone-700"
                 }`}
               >
                 <Heart className="h-5 w-5 text-rose-500" />
@@ -184,10 +184,10 @@ export const Header: React.FC = () => {
                 to="/alerts"
                 onClick={() => setMobileMenuOpen(false)}
                 className={`flex items-center space-x-2 p-3 rounded-lg text-base font-medium ${
-                  isActive("/alerts") ? "bg-amber-100 text-amber-900" : "text-stone-700"
+                  isActive("/alerts") ? "bg-primary-50 text-primary-900" : "text-stone-700"
                 }`}
               >
-                <Bell className="h-5 w-5 text-amber-600" />
+                <Bell className="h-5 w-5 text-primary-600" />
                 <span>Search Alerts</span>
               </Link>
             </>
@@ -198,7 +198,7 @@ export const Header: React.FC = () => {
               to="/dashboard"
               onClick={() => setMobileMenuOpen(false)}
               className={`flex items-center space-x-2 p-3 rounded-lg text-base font-medium ${
-                isActive("/dashboard") ? "bg-amber-100 text-amber-900" : "text-stone-700"
+                isActive("/dashboard") ? "bg-primary-50 text-primary-900" : "text-stone-700"
               }`}
             >
               <LayoutDashboard className="h-5 w-5" />
@@ -211,7 +211,7 @@ export const Header: React.FC = () => {
               to="/admin"
               onClick={() => setMobileMenuOpen(false)}
               className={`flex items-center space-x-2 p-3 rounded-lg text-base font-medium ${
-                isActive("/admin") ? "bg-amber-100 text-amber-900" : "text-stone-700"
+                isActive("/admin") ? "bg-primary-50 text-primary-900" : "text-stone-700"
               }`}
             >
               <span>🔐 Admin Panel</span>
@@ -239,7 +239,7 @@ export const Header: React.FC = () => {
                 <Link
                   to="/profile"
                   onClick={() => setMobileMenuOpen(false)}
-                  className="text-[11px] font-bold text-amber-600 hover:text-amber-700 hover:underline"
+                  className="text-[11px] font-bold text-primary-600 hover:text-primary-700 hover:underline"
                 >
                   View Profile
                 </Link>

@@ -213,7 +213,7 @@ export const LandlordDashboard: React.FC = () => {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="space-y-1">
           <h1 className="text-xl sm:text-2xl font-bold text-stone-950 font-sans flex items-center space-x-2">
-            <LayoutDashboard className="h-6 w-6 text-amber-600" />
+            <LayoutDashboard className="h-6 w-6 text-primary-600" />
             <span>Landlord Management Hub</span>
           </h1>
           <p className="text-stone-500 text-xs sm:text-sm font-medium">
@@ -223,7 +223,7 @@ export const LandlordDashboard: React.FC = () => {
 
         <Link
           to="/list-property"
-          className="inline-flex items-center space-x-1.5 py-3 px-5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-sm font-bold shadow-md shadow-amber-600/10 transition self-start"
+          className="inline-flex items-center space-x-1.5 py-3 px-5 bg-primary-600 hover:bg-primary-700 text-white rounded-xl text-sm font-bold shadow-md shadow-primary-600/10 transition self-start"
         >
           <Plus className="h-5 w-5" />
           <span>List New Property</span>
@@ -233,7 +233,7 @@ export const LandlordDashboard: React.FC = () => {
       {/* Stats Counter Rows */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
         <div className="bg-white p-5 rounded-2xl border border-stone-200/80 shadow-sm flex items-center space-x-4">
-          <div className="p-3 bg-amber-50 rounded-xl text-amber-600">
+          <div className="p-3 bg-primary-50 rounded-xl text-primary-600">
             <Building2 className="h-6 w-6" />
           </div>
           <div>
@@ -270,7 +270,7 @@ export const LandlordDashboard: React.FC = () => {
             onClick={() => setActiveTab("listings")}
             className={`py-3 text-sm font-bold border-b-2 transition ${
               activeTab === "listings"
-                ? "border-amber-600 text-amber-900"
+                ? "border-primary-600 text-primary-900"
                 : "border-transparent text-stone-500 hover:text-stone-900"
             }`}
           >
@@ -280,7 +280,7 @@ export const LandlordDashboard: React.FC = () => {
             onClick={() => setActiveTab("inquiries")}
             className={`py-3 text-sm font-bold border-b-2 transition ${
               activeTab === "inquiries"
-                ? "border-amber-600 text-amber-900"
+                ? "border-primary-600 text-primary-900"
                 : "border-transparent text-stone-500 hover:text-stone-900"
             }`}
           >
@@ -293,7 +293,7 @@ export const LandlordDashboard: React.FC = () => {
       {loading ? (
         <div className="flex justify-center py-16">
           <div className="flex flex-col items-center space-y-2 animate-pulse">
-            <Loader2 className="h-8 w-8 text-amber-600 animate-spin" />
+            <Loader2 className="h-8 w-8 text-primary-600 animate-spin" />
             <p className="text-stone-400 text-xs">Loading data...</p>
           </div>
         </div>
@@ -308,7 +308,7 @@ export const LandlordDashboard: React.FC = () => {
             </p>
             <Link
               to="/list-property"
-              className="mt-6 inline-flex items-center space-x-1 py-2.5 px-4 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold shadow-sm transition"
+              className="mt-6 inline-flex items-center space-x-1 py-2.5 px-4 bg-primary-600 hover:bg-primary-700 text-white rounded-xl text-xs font-bold shadow-sm transition"
             >
               <span>List Your First Rental</span>
             </Link>
@@ -339,7 +339,7 @@ export const LandlordDashboard: React.FC = () => {
                         <span>Active</span>
                       </span>
                     ) : (
-                      <span className="absolute top-3 left-3 bg-amber-500 text-white text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full shadow flex items-center space-x-1">
+                      <span className="absolute top-3 left-3 bg-[#D97706] text-white text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full shadow flex items-center space-x-1">
                         <Clock className="h-3 w-3" />
                         <span>Pending Payment</span>
                       </span>
@@ -417,7 +417,7 @@ export const LandlordDashboard: React.FC = () => {
                     key={inquiry.id}
                     onClick={() => setSelectedInquiryId(inquiry.id)}
                     className={`w-full text-left p-4.5 transition flex flex-col space-y-2 focus:outline-none ${
-                      isSelected ? "bg-amber-50/50 border-r-4 border-amber-600" : "hover:bg-stone-50"
+                      isSelected ? "bg-primary-50/50 border-r-4 border-primary-600" : "hover:bg-stone-50"
                     }`}
                   >
                     <div className="flex items-center justify-between">
@@ -426,7 +426,7 @@ export const LandlordDashboard: React.FC = () => {
                       </span>
                       <span className={`text-[9px] font-bold uppercase px-2 py-0.5 rounded-full ${
                         inquiry.status === "pending"
-                          ? "bg-amber-100 text-amber-800"
+                          ? "bg-gold-100 text-gold-800 border border-gold-200/30"
                           : inquiry.status === "responded"
                           ? "bg-emerald-100 text-emerald-800"
                           : "bg-stone-200 text-stone-600"
@@ -528,13 +528,13 @@ export const LandlordDashboard: React.FC = () => {
                           placeholder={`SMS reply to ${inquiry?.tenant?.full_name}...`}
                           value={newMessageText}
                           onChange={(e) => setNewMessageText(e.target.value)}
-                          className="flex-1 border border-stone-300 rounded-xl px-4 py-2.5 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
+                          className="flex-1 border border-stone-300 rounded-xl px-4 py-2.5 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-[#1E6B4A]/20 focus:border-[#1E6B4A]"
                           required
                         />
                         <button
                           type="submit"
                           disabled={sendingMessage}
-                          className="py-2.5 px-4 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold flex items-center justify-center space-x-1 shadow transition disabled:opacity-50"
+                          className="py-2.5 px-4 bg-primary-600 hover:bg-primary-700 text-white rounded-xl text-xs font-bold flex items-center justify-center space-x-1 shadow transition disabled:opacity-50"
                         >
                           {sendingMessage ? (
                             <Loader2 className="h-4 w-4 animate-spin" />

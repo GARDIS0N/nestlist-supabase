@@ -66,7 +66,7 @@ export const Login: React.FC = () => {
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#F2F4F0",
+    backgroundColor: "#FAFAF8",
     fontFamily: "system-ui, -apple-system, sans-serif",
     padding: "24px",
     boxSizing: "border-box",
@@ -75,37 +75,36 @@ export const Login: React.FC = () => {
   const cardStyle: React.CSSProperties = {
     backgroundColor: "#FFFFFF",
     borderRadius: "20px",
-    border: "1px solid #E2E5DF",
+    border: "1px solid #E2EAE6",
     padding: "40px",
     width: "100%",
     maxWidth: "420px",
-    boxShadow: "0 10px 30px rgba(0,0,0,0.03)",
+    boxShadow: "0 10px 30px rgba(15,26,20,0.04)",
     textAlign: "center",
     boxSizing: "border-box",
   };
 
   const logoStyle: React.CSSProperties = {
-    fontSize: "36px",
-    fontWeight: "800",
-    color: "#1E6B4A",
-    marginBottom: "12px",
-    letterSpacing: "-0.04em",
     textDecoration: "none",
-    display: "inline-block",
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: "8px",
+    marginBottom: "16px",
   };
 
   const headingStyle: React.CSSProperties = {
     fontSize: "24px",
     fontWeight: "700",
-    color: "#1F2937",
+    color: "#0F1A14",
     margin: "0 0 6px 0",
     letterSpacing: "-0.02em",
   };
 
   const signupLinkStyle: React.CSSProperties = {
-    color: "#C9913A",
+    color: "#D97706",
     fontSize: "14px",
-    fontWeight: "600",
+    fontWeight: "700",
     textDecoration: "none",
   };
 
@@ -113,14 +112,14 @@ export const Login: React.FC = () => {
     display: "block",
     fontSize: "13px",
     fontWeight: "600",
-    color: "#4B5563",
+    color: "#4B5E54",
     marginBottom: "6px",
   };
 
   const inputStyle: React.CSSProperties = {
     width: "100%",
     padding: "12px 14px",
-    border: "1px solid #E2E5DF",
+    border: "1px solid #E2EAE6",
     borderRadius: "10px",
     fontSize: "14px",
     outline: "none",
@@ -129,10 +128,10 @@ export const Login: React.FC = () => {
   };
 
   const buttonStyle: React.CSSProperties = {
-    backgroundColor: "#1E6B4A",
+    background: "linear-gradient(135deg,#1E6B4A,#2D9E6B)",
     color: "#FFFFFF",
     border: "none",
-    borderRadius: "10px",
+    borderRadius: "12px",
     padding: "14px 20px",
     fontSize: "16px",
     fontWeight: "600",
@@ -140,20 +139,26 @@ export const Login: React.FC = () => {
     width: "100%",
     marginTop: "16px",
     opacity: loading ? 0.7 : 1,
-    transition: "background-color 0.2s",
+    transition: "all 0.2s",
     display: "flex",
     justifyContent: "center",
     alignItems: "center",
     fontFamily: "inherit",
+    boxShadow: "0 4px 16px rgba(30,107,74,0.25)",
   };
 
   return (
     <div style={containerStyle}>
-      <div style={cardStyle}>
-        <Link to="/" style={logoStyle}>Nestlist</Link>
+      <div style={cardStyle} className="animate-fade-in">
+        <Link to="/" style={logoStyle}>
+          <div style={{ display: "flex", height: "36px", width: "36px", alignItems: "center", justifyContent: "center", borderRadius: "10px", background: "linear-gradient(135deg,#1E6B4A,#34D399)", color: "white", boxShadow: "0 8px 24px rgba(30,107,74,0.3)" }} className="animate-float">
+            <span style={{ fontSize: "18px", fontWeight: "950" }}>N</span>
+          </div>
+          <span style={{ color: "#0F1A14", fontWeight: "800", fontSize: "24px", letterSpacing: "-0.03em" }}>Nest<span style={{ color: "#1E6B4A" }}>list</span></span>
+        </Link>
         <h1 style={headingStyle}>Welcome back</h1>
         <div style={{ marginBottom: "30px" }}>
-          <span style={{ fontSize: "14px", color: "#6B7280" }}>No account? </span>
+          <span style={{ fontSize: "14px", color: "#4B5E54" }}>No account? </span>
           <Link to="/signup" style={signupLinkStyle}>Create one free →</Link>
         </div>
 
@@ -162,7 +167,7 @@ export const Login: React.FC = () => {
             style={{
               backgroundColor: "#FEF2F2",
               color: "#DC2626",
-              border: "1px solid #FEE2E2",
+              border: "1px solid #FECACA",
               borderRadius: "10px",
               padding: "12px 14px",
               fontSize: "14px",
@@ -187,6 +192,7 @@ export const Login: React.FC = () => {
               placeholder="you@example.com"
               required
               style={inputStyle}
+              className="focus:border-[#1E6B4A] focus:ring-2 focus:ring-[#1E6B4A]/10 transition"
             />
           </div>
 
@@ -203,6 +209,7 @@ export const Login: React.FC = () => {
                 placeholder="••••••••"
                 required
                 style={{ ...inputStyle, paddingRight: "44px" }}
+                className="focus:border-[#1E6B4A] focus:ring-2 focus:ring-[#1E6B4A]/10 transition"
               />
               <button
                 type="button"
@@ -215,7 +222,7 @@ export const Login: React.FC = () => {
                   background: "none",
                   border: "none",
                   cursor: "pointer",
-                  color: "#9CA3AF",
+                  color: "#8A9E94",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
@@ -227,13 +234,13 @@ export const Login: React.FC = () => {
             </div>
           </div>
 
-          <button type="submit" disabled={loading} style={buttonStyle}>
+          <button type="submit" disabled={loading} style={buttonStyle} className="hover:brightness-95 active:scale-95 duration-150">
             {loading ? "Signing in..." : "Sign in →"}
           </button>
         </form>
 
         <div style={{ marginTop: "24px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <Link to="/signup" style={{ fontSize: "13px", color: "#6B7280", textDecoration: "none" }}>
+          <Link to="/signup" style={{ fontSize: "13px", color: "#4B5E54", textDecoration: "none" }} className="hover:text-primary-600 transition">
             Forgot password?
           </Link>
           <Link to="/privacy" style={{ fontSize: "13px", color: "#1E6B4A", fontWeight: "600", textDecoration: "underline" }}>

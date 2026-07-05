@@ -18,6 +18,17 @@ const TYPES = [
   { value: "5br_plus", label: "5 Bedroom+" }
 ];
 
+const TYPE_BADGE_CLASSES: Record<string, { bg: string; text: string }> = {
+  single_room:  { bg: "#ECFDF5", text: "#065F46" },
+  bedsitter:    { bg: "#D1FAE5", text: "#065F46" },
+  studio:       { bg: "#A7F3D0", text: "#065F46" },
+  "1br":        { bg: "#F0FDF4", text: "#1E6B4A" },
+  "2br":        { bg: "#DCFCE7", text: "#166534" },
+  "3br":        { bg: "#FEF3C7", text: "#92400E" },
+  "4br":        { bg: "#FDE68A", text: "#78350F" },
+  "5br_plus":   { bg: "#FEF9C3", text: "#713F12" },
+};
+
 const AMENITIES_LIST = [
   "Water 24/7", "Borehole", "Parking", "Security Guard", "CCTV",
   "Electric Fence", "Backup Generator", "WiFi Ready", "DSTV Ready",
@@ -281,12 +292,13 @@ export const Browse: React.FC = () => {
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 space-y-6">
       
       {/* Search Header Banner */}
-      <div className="bg-gradient-to-br from-stone-900 to-amber-950 text-white rounded-2xl p-6 sm:p-10 shadow-lg relative overflow-hidden">
-        <div className="absolute top-0 right-0 w-64 h-64 bg-amber-500/10 rounded-full blur-2xl"></div>
-        <div className="absolute -bottom-10 -left-10 w-48 h-48 bg-emerald-500/5 rounded-full blur-xl"></div>
+      <div className="bg-gradient-hero bg-gradient-to-br from-[#0A4D2E] to-[#1E6B4A] text-white rounded-2xl p-6 sm:p-10 shadow-lg relative overflow-hidden">
+        <div className="absolute top-0 right-0 w-64 h-64 bg-primary-500/10 rounded-full blur-2xl"></div>
+        <div className="absolute -bottom-10 -left-10 w-48 h-48 bg-[#34D399]/5 rounded-full blur-xl"></div>
+        <div className="absolute top-10 left-1/3 w-32 h-32 bg-gold-500/5 rounded-full blur-xl"></div>
 
         <div className="max-w-2xl space-y-3 relative z-10">
-          <span className="bg-amber-600/30 text-amber-400 border border-amber-500/20 text-xs font-bold uppercase tracking-widest px-3 py-1 rounded-full">
+          <span className="bg-gold-500/20 text-[#FFFBEB] border border-gold-400/30 text-xs font-bold uppercase tracking-widest px-3 py-1 rounded-full">
             Nyumba Popote Kenya
           </span>
           <h1 className="text-2xl sm:text-4xl font-extrabold tracking-tight font-sans">
@@ -298,7 +310,7 @@ export const Browse: React.FC = () => {
         </div>
 
         {/* Floating Fast Search Panel */}
-        <div className="mt-8 bg-white text-stone-800 p-3 rounded-xl border border-stone-200 shadow-xl flex flex-col md:flex-row gap-2 relative z-10 max-w-4xl">
+        <div className="mt-8 bg-white text-stone-800 p-3 rounded-xl border border-[#E2EAE6] shadow-xl flex flex-col md:flex-row gap-2 relative z-10 max-w-4xl">
           <div className="flex-1 relative">
             <Search className="absolute left-3 top-3 h-5 w-5 text-stone-400" />
             <input
@@ -306,7 +318,7 @@ export const Browse: React.FC = () => {
               placeholder="Search estates, keywords e.g. TRM, Kilimani..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-10 pr-4 py-2.5 rounded-lg border-0 focus:outline-none focus:ring-0 text-sm"
+              className="w-full pl-10 pr-4 py-2.5 rounded-lg border-0 focus:outline-none focus:ring-2 focus:ring-[#1E6B4A]/10 text-sm"
             />
           </div>
           
@@ -357,15 +369,15 @@ export const Browse: React.FC = () => {
 
       {/* Advanced Filters Drawer (Collapse view) */}
       {showAdvancedFilters && (
-        <div className="bg-white rounded-xl border border-stone-200 p-6 shadow-md space-y-6">
+        <div className="bg-white rounded-xl border border-[#E2EAE6] p-6 shadow-md space-y-6">
           <div className="flex items-center justify-between border-b border-stone-100 pb-3">
             <h3 className="font-semibold text-stone-900 text-base flex items-center space-x-2">
-              <ListFilter className="h-5 w-5 text-amber-600" />
+              <ListFilter className="h-5 w-5 text-primary-600" />
               <span>Filter Specifications</span>
             </h3>
             <button
               onClick={clearFilters}
-              className="text-xs font-semibold text-amber-700 hover:text-amber-800"
+              className="text-xs font-semibold text-primary-600 hover:text-primary-700"
             >
               Clear All
             </button>
@@ -383,7 +395,7 @@ export const Browse: React.FC = () => {
                   placeholder="Min KSh"
                   value={minPrice}
                   onChange={(e) => setMinPrice(e.target.value)}
-                  className="w-full border border-stone-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
+                  className="w-full border border-[#E2EAE6] rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1E6B4A]/10"
                 />
                 <span className="text-stone-400 font-bold">to</span>
                 <input
@@ -391,7 +403,7 @@ export const Browse: React.FC = () => {
                   placeholder="Max KSh"
                   value={maxPrice}
                   onChange={(e) => setMaxPrice(e.target.value)}
-                  className="w-full border border-stone-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
+                  className="w-full border border-[#E2EAE6] rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1E6B4A]/10"
                 />
               </div>
             </div>
@@ -401,7 +413,7 @@ export const Browse: React.FC = () => {
               <label className="text-xs font-bold text-stone-700 uppercase tracking-wider block">
                 Must-Have Amenities
               </label>
-              <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto p-1 border border-stone-200 rounded-xl">
+              <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto p-1 border border-[#E2EAE6] rounded-xl">
                 {AMENITIES_LIST.map((amenity, idx) => {
                   const isChecked = selectedAmenities.includes(amenity);
                   return (
@@ -410,8 +422,8 @@ export const Browse: React.FC = () => {
                       onClick={() => toggleAmenity(amenity)}
                       className={`px-3 py-1 text-xs font-semibold rounded-lg border transition ${
                         isChecked
-                          ? "bg-amber-100 border-amber-300 text-amber-900"
-                          : "bg-white border-stone-200 text-stone-600 hover:border-stone-300"
+                          ? "bg-primary-50 border-primary-200 text-primary-800"
+                          : "bg-white border-[#E2EAE6] text-stone-600 hover:border-stone-300"
                       }`}
                     >
                       {amenity}
@@ -432,27 +444,27 @@ export const Browse: React.FC = () => {
           </p>
           
           {usingFallback && (
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-amber-50 text-amber-800 border border-amber-200">
-              <AlertTriangle className="h-3.5 w-3.5 text-amber-600 animate-pulse" />
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-gold-100 text-gold-800 border border-gold-200">
+              <AlertTriangle className="h-3.5 w-3.5 text-gold-600 animate-pulse" />
               <span>Database Connection Notice</span>
             </span>
           )}
         </div>
 
         {usingFallback && (
-          <div className="p-5 rounded-2xl bg-amber-50 border border-amber-200/80 text-amber-950 text-xs sm:text-sm flex flex-col md:flex-row items-start gap-4 shadow-sm font-medium">
-            <div className="p-2.5 bg-amber-100 rounded-xl text-amber-700 shrink-0">
+          <div className="p-5 rounded-2xl bg-gold-50 border border-gold-200/80 text-gold-950 text-xs sm:text-sm flex flex-col md:flex-row items-start gap-4 shadow-sm font-medium animate-fade-in">
+            <div className="p-2.5 bg-gold-100 rounded-xl text-gold-700 shrink-0">
               <Database className="h-5 w-5" />
             </div>
             <div className="space-y-2">
               <h4 className="font-bold text-stone-900 text-sm flex items-center gap-1.5">
                 Supabase Tables Missing / Uninitialized
               </h4>
-              <p className="text-stone-600 leading-relaxed text-xs">
-                Nestlist is pointed to your real live Supabase instance (<span className="font-mono bg-white px-1 py-0.5 rounded text-amber-800 break-all">{getSupabaseConfig().url}</span>). However, required tables (e.g. <code className="font-mono bg-stone-100 px-1 py-0.5 rounded text-red-700">properties</code>) were not found on this project.
+              <p className="text-[#4B5E54] leading-relaxed text-xs">
+                Nestlist is pointed to your real live Supabase instance (<span className="font-mono bg-white px-1 py-0.5 rounded text-gold-800 break-all">{getSupabaseConfig().url}</span>). However, required tables (e.g. <code className="font-mono bg-stone-100 px-1 py-0.5 rounded text-red-700">properties</code>) were not found on this project.
               </p>
-              <p className="text-stone-600 leading-relaxed text-xs">
-                We have gracefully loaded our high-fidelity local listings so you can continue exploring the application features immediately! To activate live database entries, please go to the <strong className="text-stone-900">Sign In</strong> or <strong className="text-stone-900">Sign Up</strong> page, expand the <strong className="text-amber-900">Supabase Database Connection</strong> panel, copy the table creation script, and run it in your <strong className="text-stone-900">Supabase SQL Editor</strong>.
+              <p className="text-[#4B5E54] leading-relaxed text-xs">
+                We have gracefully loaded our high-fidelity local listings so you can continue exploring the application features immediately! To activate live database entries, please go to the <strong className="text-stone-900">Sign In</strong> or <strong className="text-stone-900">Sign Up</strong> page, expand the <strong className="text-gold-900">Supabase Database Connection</strong> panel, copy the table creation script, and run it in your <strong className="text-stone-900">Supabase SQL Editor</strong>.
               </p>
             </div>
           </div>
@@ -462,7 +474,7 @@ export const Browse: React.FC = () => {
           /* LOADING PLACEHOLDERS */
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {[1, 2, 3, 4, 5, 6].map((i) => (
-              <div key={i} className="bg-white rounded-2xl border border-stone-200 overflow-hidden space-y-4 animate-pulse">
+              <div key={i} className="bg-white rounded-2xl border border-[#E2EAE6] overflow-hidden space-y-4 animate-pulse">
                 <div className="bg-stone-200 aspect-video w-full"></div>
                 <div className="p-5 space-y-3">
                   <div className="h-4 bg-stone-200 rounded w-1/3"></div>
@@ -474,16 +486,16 @@ export const Browse: React.FC = () => {
           </div>
         ) : properties.length === 0 ? (
           /* EMPTY STATE */
-          <div className="bg-white rounded-2xl border border-stone-200 py-16 px-4 text-center max-w-xl mx-auto">
+          <div className="bg-white rounded-2xl border border-[#E2EAE6] py-16 px-4 text-center max-w-xl mx-auto">
             <div className="text-4xl mb-3">🏡</div>
-            <h3 className="font-bold text-lg text-stone-900">No properties match your filters</h3>
-            <p className="text-stone-500 text-sm mt-1 max-w-md mx-auto leading-relaxed">
+            <h3 className="font-bold text-lg text-[#0F1A14]">No properties match your filters</h3>
+            <p className="text-[#4B5E54] text-sm mt-1 max-w-md mx-auto leading-relaxed">
               We couldn't find any active rental listings in this range. Try clearing your search keyword, adjusting your budget bounds, or subscribing for search alerts to get notified by SMS when matches are listed!
             </p>
             {profile?.role === "tenant" && (
               <Link
                 to="/alerts"
-                className="mt-6 inline-flex items-center space-x-1.5 py-2.5 px-4 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-sm font-bold shadow-sm transition"
+                className="mt-6 inline-flex items-center space-x-1.5 py-2.5 px-4 bg-primary-600 hover:bg-primary-700 text-white rounded-xl text-sm font-bold shadow-sm transition"
               >
                 <span>Setup Search Alert</span>
               </Link>
@@ -495,12 +507,13 @@ export const Browse: React.FC = () => {
             {properties.map((property) => {
               const isSaved = savedPropertyIds.has(property.id);
               const coverImage = property.images?.[0] || "https://images.unsplash.com/photo-1522771739844-6a9f6d5f14af?auto=format&fit=crop&w=600&q=80";
+              const typeColors = TYPE_BADGE_CLASSES[property.type as keyof typeof TYPE_BADGE_CLASSES] || { bg: "#F3F4F6", text: "#374151" };
 
               return (
                 <Link
                   key={property.id}
                   to={`/property/${property.id}`}
-                  className="group bg-white rounded-2xl border border-stone-200/80 overflow-hidden hover:shadow-xl hover:border-amber-200 transition-all duration-300 flex flex-col h-full"
+                  className="group bg-white rounded-2xl border border-[#E2EAE6] overflow-hidden hover:shadow-xl hover:border-primary-300 hover:ring-2 hover:ring-primary-500/5 transition-all duration-300 flex flex-col h-full"
                 >
                   {/* Photo Container */}
                   <div className="relative aspect-video w-full overflow-hidden bg-stone-100">
@@ -515,12 +528,15 @@ export const Browse: React.FC = () => {
                     />
 
                     {/* Badge: Rent Type */}
-                    <span className="absolute top-3 left-3 bg-stone-900/80 backdrop-blur-sm text-amber-400 text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full border border-stone-700">
+                    <span 
+                      style={{ backgroundColor: typeColors.bg, color: typeColors.text }} 
+                      className="absolute top-3 left-3 text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full shadow-sm"
+                    >
                       {getPropertyTypeLabel(property.type)}
                     </span>
 
                     {/* Badge: Verification Status */}
-                    <span className="absolute top-3 right-3 bg-emerald-600 text-white text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full shadow-sm flex items-center space-x-1">
+                    <span className="absolute top-3 right-3 bg-primary-600 text-white text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full shadow-sm flex items-center space-x-1">
                       <span className="h-1.5 w-1.5 rounded-full bg-white animate-pulse"></span>
                       <span>Verified</span>
                     </span>
@@ -532,7 +548,7 @@ export const Browse: React.FC = () => {
                         className={`absolute bottom-3 right-3 p-2.5 rounded-full backdrop-blur-md border shadow-md transition-all duration-200 ${
                           isSaved
                             ? "bg-rose-50 border-rose-200 text-rose-500 hover:bg-rose-100 scale-110"
-                            : "bg-white/80 border-stone-200 text-stone-500 hover:text-rose-500 hover:bg-white"
+                            : "bg-white/80 border-[#E2EAE6] text-stone-500 hover:text-rose-500 hover:bg-white"
                         }`}
                         title={isSaved ? "Remove from saved" : "Save property"}
                       >
@@ -543,16 +559,16 @@ export const Browse: React.FC = () => {
 
                   {/* Body Details */}
                   <div className="p-5 flex flex-col flex-1 space-y-3">
-                    <div className="flex items-center space-x-1.5 text-stone-400 text-xs font-semibold">
-                      <MapPin className="h-3.5 w-3.5 text-amber-600 shrink-0" />
+                    <div className="flex items-center space-x-1.5 text-[#4B5E54] text-xs font-semibold">
+                      <MapPin className="h-3.5 w-3.5 text-primary-600 shrink-0" />
                       <span className="truncate">{property.location}, {property.county}</span>
                     </div>
 
-                    <h3 className="font-sans font-bold text-stone-950 text-base line-clamp-1 group-hover:text-amber-800 transition-colors">
+                    <h3 className="font-sans font-bold text-[#0F1A14] text-base line-clamp-1 group-hover:text-primary-800 transition-colors">
                       {property.title}
                     </h3>
 
-                    <p className="text-xs text-stone-500 line-clamp-2 leading-relaxed">
+                    <p className="text-xs text-[#4B5E54] line-clamp-2 leading-relaxed">
                       {property.description}
                     </p>
 
@@ -562,13 +578,13 @@ export const Browse: React.FC = () => {
                         {property.amenities.slice(0, 3).map((amenity: string, i: number) => (
                           <span
                             key={i}
-                            className="bg-stone-100 text-stone-600 text-[10px] font-semibold px-2 py-0.5 rounded"
+                            className="bg-[#DCFCE7] text-[#065F46] text-[10px] font-semibold px-2 py-0.5 rounded border border-[#A7F3D0]/30"
                           >
                             {amenity}
                           </span>
                         ))}
                         {property.amenities.length > 3 && (
-                          <span className="bg-stone-50 text-stone-400 text-[9px] font-bold px-1.5 py-0.5 rounded">
+                          <span className="bg-stone-50 text-[#8A9E94] text-[9px] font-bold px-1.5 py-0.5 rounded border border-stone-200">
                             +{property.amenities.length - 3} more
                           </span>
                         )}
@@ -576,14 +592,14 @@ export const Browse: React.FC = () => {
                     )}
 
                     {/* Price and Action Footer */}
-                    <div className="pt-3 border-t border-stone-100 mt-auto flex items-baseline justify-between">
+                    <div className="pt-3 border-t border-[#E2EAE6] mt-auto flex items-baseline justify-between">
                       <div>
-                        <span className="text-lg font-extrabold text-stone-950">
+                        <span className="text-lg font-extrabold text-[#D97706]">
                           KSh {parseFloat(property.price).toLocaleString()}
                         </span>
-                        <span className="text-xs text-stone-500 font-medium"> / Month</span>
+                        <span className="text-xs text-[#4B5E54] font-medium"> / Month</span>
                       </div>
-                      <span className="text-xs font-bold text-amber-700 group-hover:underline flex items-center space-x-0.5">
+                      <span className="text-xs font-bold text-primary-600 group-hover:underline flex items-center space-x-0.5">
                         <span>View Details</span>
                         <span>→</span>
                       </span>

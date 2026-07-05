@@ -153,7 +153,7 @@ export const SearchAlerts: React.FC = () => {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="space-y-1">
           <h1 className="text-xl sm:text-2xl font-bold text-stone-950 font-sans flex items-center space-x-2">
-            <Bell className="h-6 w-6 text-amber-600 animate-swing" />
+            <Bell className="h-6 w-6 text-primary-600 animate-swing" />
             <span>SMS Search Alerts</span>
           </h1>
           <p className="text-stone-500 text-xs sm:text-sm font-medium">
@@ -163,7 +163,7 @@ export const SearchAlerts: React.FC = () => {
         
         <button
           onClick={() => setModalOpen(true)}
-          className="inline-flex items-center space-x-1.5 py-2.5 px-4 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold shadow-md transition self-start"
+          className="inline-flex items-center space-x-1.5 py-2.5 px-4 bg-primary-600 hover:bg-primary-700 text-white rounded-xl text-xs font-bold shadow-md transition self-start"
         >
           <Plus className="h-4.5 w-4.5" />
           <span>New Alert</span>
@@ -171,8 +171,8 @@ export const SearchAlerts: React.FC = () => {
       </div>
 
       {/* Info Banner */}
-      <div className="bg-amber-50 border border-amber-200/80 rounded-xl p-4 flex items-start space-x-3 text-xs sm:text-sm text-stone-700 leading-relaxed font-medium">
-        <Info className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
+      <div className="bg-[#FEF3C7] border border-[#FDE68A] rounded-xl p-4 flex items-start space-x-3 text-xs sm:text-sm text-stone-700 leading-relaxed font-medium">
+        <Info className="h-5 w-5 text-[#92400E] shrink-0 mt-0.5" />
         <div className="space-y-1">
           <p className="font-bold">How Search Alerts Work:</p>
           <p>
@@ -185,7 +185,7 @@ export const SearchAlerts: React.FC = () => {
       {loading ? (
         <div className="flex justify-center py-16">
           <div className="flex flex-col items-center space-y-2">
-            <Loader2 className="h-8 w-8 text-amber-600 animate-spin" />
+            <Loader2 className="h-8 w-8 text-primary-600 animate-spin" />
             <p className="text-stone-400 text-xs font-medium">Fetching alerts...</p>
           </div>
         </div>
@@ -199,7 +199,7 @@ export const SearchAlerts: React.FC = () => {
           </p>
           <button
             onClick={() => setModalOpen(true)}
-            className="mt-6 inline-flex items-center space-x-1 py-2 px-4 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-bold shadow transition"
+            className="mt-6 inline-flex items-center space-x-1 py-2 px-4 bg-primary-600 hover:bg-primary-700 text-white rounded-lg text-xs font-bold shadow transition"
           >
             <span>Create First Alert</span>
           </button>
@@ -211,7 +211,7 @@ export const SearchAlerts: React.FC = () => {
             <div
               key={alert.id}
               className={`bg-white rounded-2xl border p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition shadow-sm ${
-                alert.is_active ? "border-amber-200" : "border-stone-200 bg-stone-50/50"
+                alert.is_active ? "border-primary-200" : "border-stone-200 bg-stone-50/50"
               }`}
             >
               <div className="space-y-2">
@@ -225,7 +225,7 @@ export const SearchAlerts: React.FC = () => {
                 {/* Tags Metadata */}
                 <div className="flex flex-wrap gap-1.5 pt-1">
                   {alert.county && (
-                    <span className="bg-amber-50 text-amber-800 border border-amber-100 text-[10px] font-bold px-2 py-0.5 rounded-md">
+                    <span className="bg-gold-50 text-gold-800 border border-gold-200/30 text-[10px] font-bold px-2 py-0.5 rounded-md">
                       {alert.county}
                     </span>
                   )}
@@ -235,7 +235,7 @@ export const SearchAlerts: React.FC = () => {
                     </span>
                   )}
                   {(alert.min_price || alert.max_price) && (
-                    <span className="bg-stone-900 text-amber-400 text-[10px] font-mono px-2 py-0.5 rounded-md">
+                    <span className="bg-stone-900 text-gold-400 text-[10px] font-mono px-2 py-0.5 rounded-md">
                       {alert.min_price ? `KSh ${parseFloat(alert.min_price).toLocaleString()}` : "0"}{" - "}
                       {alert.max_price ? `KSh ${parseFloat(alert.max_price).toLocaleString()}` : "Any"}
                     </span>
@@ -297,7 +297,7 @@ export const SearchAlerts: React.FC = () => {
           <div className="bg-white w-full max-w-lg rounded-2xl border border-stone-200 overflow-hidden shadow-2xl relative">
             <div className="bg-stone-900 text-white px-6 py-4 flex items-center justify-between">
               <h3 className="font-sans font-bold text-base flex items-center space-x-1.5">
-                <Bell className="h-5 w-5 text-amber-500" />
+                <Bell className="h-5 w-5 text-gold-500" />
                 <span>Create SMS Search Alert</span>
               </h3>
               <button
@@ -319,7 +319,7 @@ export const SearchAlerts: React.FC = () => {
                   placeholder="e.g. Roysambu Bedsitters, Kilimani Studios"
                   value={alertName}
                   onChange={(e) => setAlertName(e.target.value)}
-                  className="w-full border border-stone-300 rounded-xl px-4.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
+                  className="w-full border border-stone-300 rounded-xl px-4.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                   required
                 />
               </div>
@@ -333,7 +333,7 @@ export const SearchAlerts: React.FC = () => {
                   <select
                     value={selectedCounty}
                     onChange={(e) => setSelectedCounty(e.target.value)}
-                    className="w-full border border-stone-300 rounded-xl px-3.5 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-amber-500"
+                    className="w-full border border-stone-300 rounded-xl px-3.5 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                   >
                     <option value="">Any County</option>
                     {COUNTIES.map((c, i) => (
@@ -349,7 +349,7 @@ export const SearchAlerts: React.FC = () => {
                   <select
                     value={selectedType}
                     onChange={(e) => setSelectedType(e.target.value)}
-                    className="w-full border border-stone-300 rounded-xl px-3.5 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-amber-500"
+                    className="w-full border border-stone-300 rounded-xl px-3.5 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                   >
                     <option value="">Any Type</option>
                     {TYPES.map((t, i) => (
@@ -370,14 +370,14 @@ export const SearchAlerts: React.FC = () => {
                     placeholder="Min Price (Optional)"
                     value={minPrice}
                     onChange={(e) => setMinPrice(e.target.value)}
-                    className="w-full border border-stone-300 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
+                    className="w-full border border-stone-300 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                   />
                   <input
                     type="number"
                     placeholder="Max Price (Optional)"
                     value={maxPrice}
                     onChange={(e) => setMaxPrice(e.target.value)}
-                    className="w-full border border-stone-300 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
+                    className="w-full border border-stone-300 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                   />
                 </div>
               </div>
@@ -397,7 +397,7 @@ export const SearchAlerts: React.FC = () => {
                         onClick={() => toggleAmenity(amenity)}
                         className={`px-2.5 py-1 text-xs font-semibold rounded-lg border transition ${
                           isChecked
-                            ? "bg-amber-100 border-amber-300 text-amber-900"
+                            ? "bg-gold-100 border border-gold-300/40 text-gold-900"
                             : "bg-white border-stone-200 text-stone-600 hover:border-stone-300"
                         }`}
                       >
@@ -420,7 +420,7 @@ export const SearchAlerts: React.FC = () => {
                 <button
                   type="submit"
                   disabled={creating}
-                  className="flex items-center space-x-1.5 py-2.5 px-5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold shadow-md transition disabled:opacity-50"
+                  className="flex items-center space-x-1.5 py-2.5 px-5 bg-primary-600 hover:bg-primary-700 text-white rounded-xl text-xs font-bold shadow-md transition disabled:opacity-50"
                 >
                   {creating ? (
                     <Loader2 className="h-4 w-4 animate-spin" />

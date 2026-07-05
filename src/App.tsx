@@ -25,7 +25,7 @@ export default function App() {
   return (
     <AuthProvider>
       <BrowserRouter>
-        <div className="min-h-screen bg-stone-50 text-stone-900 flex flex-col font-sans selection:bg-amber-100 selection:text-amber-900">
+        <div className="min-h-screen bg-stone-50 text-stone-900 flex flex-col font-sans selection:bg-primary-100 selection:text-primary-900">
           {/* Main Application Navigation Header */}
           <Header />
 
@@ -158,7 +158,7 @@ export default function App() {
                 Connecting Landlords and Tenants across Nairobi, Kiambu, Nakuru, Kisumu, and Mombasa.
               </p>
               <div className="flex justify-center space-x-4 text-stone-500 text-[11px] font-medium pt-1">
-                <Link to="/privacy" className="hover:text-amber-500 hover:underline transition">Privacy Policy</Link>
+                <Link to="/privacy" className="hover:text-primary-500 hover:underline transition">Privacy Policy</Link>
                 <span>•</span>
                 <span className="text-stone-600">Terms of Service</span>
               </div>

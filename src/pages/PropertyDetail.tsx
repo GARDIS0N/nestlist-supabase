@@ -188,7 +188,7 @@ export const PropertyDetail: React.FC = () => {
     return (
       <div className="min-h-[calc(100vh-4rem)] flex items-center justify-center bg-stone-50">
         <div className="flex flex-col items-center space-y-3">
-          <Loader2 className="h-10 w-10 text-amber-600 animate-spin" />
+          <Loader2 className="h-10 w-10 text-primary-600 animate-spin" />
           <p className="text-stone-500 font-medium text-sm">Loading rental details...</p>
         </div>
       </div>
@@ -200,7 +200,7 @@ export const PropertyDetail: React.FC = () => {
       <div className="mx-auto max-w-7xl px-4 py-16 text-center">
         <h2 className="text-2xl font-bold text-stone-900">Property Not Found</h2>
         <p className="text-stone-500 mt-2">The listing you are trying to view has expired, been deactivated or deleted.</p>
-        <Link to="/" className="mt-6 inline-flex items-center space-x-1.5 py-2 px-4 bg-amber-600 text-white rounded-lg text-sm font-semibold shadow">
+        <Link to="/" className="mt-6 inline-flex items-center space-x-1.5 py-2 px-4 bg-primary-600 text-white rounded-lg text-sm font-semibold shadow">
           <ArrowLeft className="h-4 w-4" />
           <span>Back to Browse</span>
         </Link>
@@ -300,7 +300,7 @@ export const PropertyDetail: React.FC = () => {
                       key={idx}
                       onClick={() => setActiveImageIndex(idx)}
                       className={`h-2 rounded-full transition-all ${
-                        idx === activeImageIndex ? "w-6 bg-amber-500" : "w-2 bg-white/60"
+                        idx === activeImageIndex ? "w-6 bg-gold-500" : "w-2 bg-white/60"
                       }`}
                     ></button>
                   ))}
@@ -313,14 +313,14 @@ export const PropertyDetail: React.FC = () => {
           <div className="bg-white p-6 rounded-2xl border border-stone-200/80 shadow-sm space-y-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
-                <span className="bg-amber-100 text-amber-900 border border-amber-200 text-xs font-bold px-3 py-1 rounded-full capitalize">
+                <span className="bg-gold-100 text-gold-900 border border-gold-200/30 text-xs font-bold px-3 py-1 rounded-full capitalize">
                   {getPropertyTypeLabel(property.type)}
                 </span>
                 <h1 className="text-xl sm:text-2xl font-bold font-sans text-stone-950 mt-2.5">
                   {property.title}
                 </h1>
                 <div className="flex items-center space-x-1 text-stone-500 text-xs sm:text-sm font-semibold mt-1">
-                  <MapPin className="h-4 w-4 text-amber-600 shrink-0" />
+                  <MapPin className="h-4 w-4 text-primary-600 shrink-0" />
                   <span>{property.location}, {property.county}</span>
                 </div>
               </div>
@@ -378,7 +378,7 @@ export const PropertyDetail: React.FC = () => {
             {landlord ? (
               <div className="space-y-4">
                 <div className="flex items-center space-x-3 bg-stone-50 p-3.5 rounded-xl border border-stone-200/50">
-                  <div className="h-11 w-11 rounded-full bg-amber-100 border border-amber-200 text-amber-900 font-bold flex items-center justify-center text-sm capitalize">
+                  <div className="h-11 w-11 rounded-full bg-primary-50 border border-primary-200 text-primary-900 font-bold flex items-center justify-center text-sm capitalize">
                     {landlord.full_name.charAt(0)}
                   </div>
                   <div>
@@ -409,7 +409,7 @@ export const PropertyDetail: React.FC = () => {
             )}
 
             <div className="border-t border-stone-100 pt-5 space-y-3">
-              <div className="flex items-start space-x-2 text-[11px] text-stone-400 font-medium leading-relaxed bg-amber-50/40 p-2.5 rounded-lg border border-amber-100/50">
+              <div className="flex items-start space-x-2 text-[11px] text-stone-400 font-medium leading-relaxed bg-[#FEF3C7]/40 p-2.5 rounded-lg border border-[#FDE68A]/50">
                 <ShieldCheck className="h-4 w-4 text-emerald-600 shrink-0 mt-0.5" />
                 <p>
                   Landlord verified via safaricom billing. Nestlist logs all chat histories for tenant safety. Do not pay deposit before viewing.
@@ -424,7 +424,7 @@ export const PropertyDetail: React.FC = () => {
               ) : (
                 <button
                   onClick={() => setInquiryModalOpen(true)}
-                  className="w-full flex items-center justify-center space-x-2 py-3 px-4 bg-amber-600 hover:bg-amber-700 text-white rounded-xl shadow-md font-bold text-sm transition"
+                  className="w-full flex items-center justify-center space-x-2 py-3 px-4 bg-primary-600 hover:bg-primary-700 text-white rounded-xl shadow-md font-bold text-sm transition"
                 >
                   <MessageSquare className="h-4.5 w-4.5" />
                   <span>Send SMS Inquiry</span>
@@ -490,7 +490,7 @@ export const PropertyDetail: React.FC = () => {
                       value={inquiryMessage}
                       onChange={(e) => setInquiryMessage(e.target.value)}
                       placeholder="e.g. Jambo, I am interested in renting this bedsitter. Is it available for viewing this Saturday at 10 AM?"
-                      className="w-full border border-stone-300 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
+                      className="w-full border border-stone-300 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#1E6B4A]/20 focus:border-[#1E6B4A]"
                       required
                     ></textarea>
                     {!profile?.phone ? (
@@ -504,7 +504,7 @@ export const PropertyDetail: React.FC = () => {
                           placeholder="e.g. +254700123456"
                           value={tenantPhone}
                           onChange={(e) => setTenantPhone(e.target.value)}
-                          className="w-full border border-stone-300 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
+                          className="w-full border border-stone-300 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#1E6B4A]/20 focus:border-[#1E6B4A]"
                         />
                         <p className="text-[10px] text-stone-400">
                           Enter your phone number so the landlord can contact you directly. This will be saved to your profile.
@@ -535,7 +535,7 @@ export const PropertyDetail: React.FC = () => {
                     <button
                       type="submit"
                       disabled={sendingInquiry}
-                      className="flex items-center space-x-1.5 py-2.5 px-5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold shadow-md transition disabled:opacity-50"
+                      className="flex items-center space-x-1.5 py-2.5 px-5 bg-primary-600 hover:bg-primary-700 text-white rounded-xl text-xs font-bold shadow-md transition disabled:opacity-50"
                     >
                       {sendingInquiry ? (
                         <Loader2 className="h-4 w-4 animate-spin" />
