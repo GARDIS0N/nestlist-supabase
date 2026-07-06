@@ -452,6 +452,27 @@ export const ListProperty: React.FC = () => {
             <span>Step 3: Property Images</span>
           </h2>
 
+          <div style={{
+            background: "#FEF3C7",
+            border: "1px solid #FDE68A",
+            borderLeft: "4px solid #D97706",
+            borderRadius: "10px",
+            padding: "12px 14px",
+            marginBottom: "16px",
+          }}>
+            <div style={{ fontWeight: 700, color: "#92400E", marginBottom: 6 }}>
+              📸 Photo Guidelines
+            </div>
+            <ul style={{ color: "#92400E", fontSize: 13, lineHeight: 1.7 }} className="list-disc pl-4 space-y-1">
+              <li>✅ Upload photos of the actual property</li>
+              <li>✅ Show: living room, bedroom, kitchen, bathroom</li>
+              <li>✅ Take photos in good lighting</li>
+              <li>❌ Do NOT upload flyers or posters</li>
+              <li>❌ Do NOT upload photos of people</li>
+              <li>❌ Do NOT upload screenshots or text images</li>
+            </ul>
+          </div>
+
           <PhotoUpload propertyId={propertyId || tempId} photos={uploadedImages} onChange={(urls) => setUploadedImages(urls)} />
 
           <div className="flex justify-between pt-5 border-t border-stone-100">

@@ -9,6 +9,37 @@ export const Header: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false);
+  const [counts, setCounts] = React.useState({ listings: 0, inquiries: 0, unreadInquiries: 0 });
+
+  React.useEffect(() => {
+    if (profile?.role === "landlord") {
+      const fetchCounts = async () => {
+        try {
+          const { count: listingsCount } = await supabase
+            .from("properties")
+            .select("id", { count: "exact", head: true })
+            .eq("landlord_id", profile.id);
+
+          const { data: inquiriesData } = await supabase
+            .from("inquiries")
+            .select("status")
+            .eq("landlord_id", profile.id);
+
+          const totalInquiries = inquiriesData?.length || 0;
+          const unreadInquiries = inquiriesData?.filter(i => i.status === "pending").length || 0;
+
+          setCounts({
+            listings: listingsCount || 0,
+            inquiries: totalInquiries,
+            unreadInquiries: unreadInquiries
+          });
+        } catch (e) {
+          console.error("Error fetching counts in Header:", e);
+        }
+      };
+      fetchCounts();
+    }
+  }, [profile, location.pathname]);
 
   // Check if current user has the admin privilege
   const isAdmin = profile?.role === "admin" || profile?.email === "gardisonkirui11@gmail.com" || profile?.id === "42eca9a0-c070-4898-b830-46c3247ea71d" || profile?.id === "admin-1";
@@ -156,103 +187,178 @@ export const Header: React.FC = () => {
 
       {/* Mobile Menu */}
       {mobileMenuOpen && profile && (
-        <div className="md:hidden border-b border-stone-200 bg-stone-50 px-4 pt-2 pb-4 space-y-1">
-          <Link
-            to="/"
-            onClick={() => setMobileMenuOpen(false)}
-            className={`flex items-center space-x-2 p-3 rounded-lg text-base font-medium ${
-              isActive("/") ? "bg-primary-50 text-primary-900" : "text-stone-700"
-            }`}
-          >
-            <Home className="h-5 w-5" />
-            <span>Browse Rentals</span>
-          </Link>
+        <div className="md:hidden border-b border-stone-200 bg-white rounded-b-2xl shadow-xl overflow-hidden animate-fade-in mx-4 my-2">
+          {/* Header in menu: green gradient with NestList logo */}
+          <div className="px-4 py-3.5 bg-gradient-to-r from-[#0A4D2E] to-[#1E6B4A] text-white flex items-center justify-between">
+            <div className="flex items-center space-x-2">
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-white text-[#1E6B4A] font-bold text-sm shadow">
+                N
+              </div>
+              <span className="font-sans font-bold tracking-tight text-white text-sm">
+                Nestlist <span className="text-[10px] font-normal opacity-85 uppercase tracking-wide">Menu</span>
+              </span>
+            </div>
+            {/* Role badge */}
+            <span className="bg-white/20 text-white text-[10px] font-bold px-2.5 py-0.5 rounded-full uppercase tracking-wider">
+              {profile.role}
+            </span>
+          </div>
 
-          {profile.role === "tenant" && (
-            <>
-              <Link
-                to="/saved"
-                onClick={() => setMobileMenuOpen(false)}
-                className={`flex items-center space-x-2 p-3 rounded-lg text-base font-medium ${
-                  isActive("/saved") ? "bg-primary-50 text-primary-900" : "text-stone-700"
-                }`}
-              >
-                <Heart className="h-5 w-5 text-rose-500" />
-                <span>Saved Rentals</span>
-              </Link>
-              <Link
-                to="/alerts"
-                onClick={() => setMobileMenuOpen(false)}
-                className={`flex items-center space-x-2 p-3 rounded-lg text-base font-medium ${
-                  isActive("/alerts") ? "bg-primary-50 text-primary-900" : "text-stone-700"
-                }`}
-              >
-                <Bell className="h-5 w-5 text-primary-600" />
-                <span>Search Alerts</span>
-              </Link>
-            </>
-          )}
+          <div className="p-2 space-y-1">
+            {profile.role === "landlord" ? (
+              <>
+                {/* My Listings */}
+                <Link
+                  to="/dashboard"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className={`flex items-center justify-between h-[48px] px-4 rounded-xl text-sm font-semibold transition-all ${
+                    isActive("/dashboard") ? "bg-emerald-50 text-emerald-800" : "text-stone-700 hover:bg-stone-50"
+                  }`}
+                >
+                  <div className="flex items-center space-x-2.5">
+                    <span className="text-base">📋</span>
+                    <span>My Listings ({counts.listings})</span>
+                  </div>
+                </Link>
 
-          {profile.role === "landlord" && (
-            <Link
-              to="/dashboard"
-              onClick={() => setMobileMenuOpen(false)}
-              className={`flex items-center space-x-2 p-3 rounded-lg text-base font-medium ${
-                isActive("/dashboard") ? "bg-primary-50 text-primary-900" : "text-stone-700"
-              }`}
-            >
-              <LayoutDashboard className="h-5 w-5" />
-              <span>Landlord Dashboard</span>
-            </Link>
-          )}
+                {/* Inquiries */}
+                <Link
+                  to="/dashboard?tab=inquiries"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="flex items-center justify-between h-[48px] px-4 rounded-xl text-sm font-semibold text-stone-700 hover:bg-stone-50 transition-all"
+                >
+                  <div className="flex items-center space-x-2.5">
+                    <span className="text-base">💬</span>
+                    <span>Inquiries ({counts.inquiries})</span>
+                  </div>
+                  {counts.unreadInquiries > 0 && (
+                    <span className="bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
+                      {counts.unreadInquiries} new
+                    </span>
+                  )}
+                </Link>
 
-          {profile?.role === "admin" && (
-            <Link
-              to="/admin"
-              onClick={() => setMobileMenuOpen(false)}
-              className={`flex items-center space-x-2 p-3 rounded-lg text-base font-medium ${
-                isActive("/admin") ? "bg-primary-50 text-primary-900" : "text-stone-700"
-              }`}
-            >
-              <span>🔐 Admin Panel</span>
-            </Link>
-          )}
+                {/* Payment History */}
+                <Link
+                  to="/dashboard"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="flex items-center space-x-2.5 h-[48px] px-4 rounded-xl text-sm font-semibold text-stone-700 hover:bg-stone-50 transition-all"
+                >
+                  <span className="text-base">💳</span>
+                  <span>Payment History</span>
+                </Link>
 
-          <div className="pt-4 border-t border-stone-200 mt-2 flex items-center justify-between">
-            <div className="flex items-center space-x-3">
-              {profile.avatar_url ? (
-                <img
-                  src={profile.avatar_url}
-                  alt={profile.full_name}
-                  className="h-10 w-10 rounded-full object-cover border border-stone-200 shadow-sm"
-                  referrerPolicy="no-referrer"
-                />
-              ) : (
-                <div className="flex h-9 w-9 items-center justify-center rounded-full bg-stone-200 text-stone-700">
-                  <User className="h-5 w-5" />
-                </div>
-              )}
-              <div>
-                <p className="text-sm font-semibold text-stone-800 leading-tight">
-                  {profile.full_name}
-                </p>
+                {/* Account Settings */}
                 <Link
                   to="/profile"
                   onClick={() => setMobileMenuOpen(false)}
-                  className="text-[11px] font-bold text-primary-600 hover:text-primary-700 hover:underline"
+                  className={`flex items-center space-x-2.5 h-[48px] px-4 rounded-xl text-sm font-semibold transition-all ${
+                    isActive("/profile") ? "bg-emerald-50 text-emerald-800" : "text-stone-700 hover:bg-stone-50"
+                  }`}
                 >
-                  View Profile
+                  <span className="text-base">⚙️</span>
+                  <span>Account Settings</span>
                 </Link>
+              </>
+            ) : (
+              <>
+                {/* Tenant Menu */}
+                <Link
+                  to="/"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className={`flex items-center space-x-2.5 h-[48px] px-4 rounded-xl text-sm font-semibold transition-all ${
+                    isActive("/") ? "bg-emerald-50 text-emerald-800" : "text-stone-700 hover:bg-stone-50"
+                  }`}
+                >
+                  <Home className="h-5 w-5 text-stone-500" />
+                  <span>Browse Rentals</span>
+                </Link>
+
+                <Link
+                  to="/saved"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className={`flex items-center space-x-2.5 h-[48px] px-4 rounded-xl text-sm font-semibold transition-all ${
+                    isActive("/saved") ? "bg-emerald-50 text-emerald-800" : "text-stone-700 hover:bg-stone-50"
+                  }`}
+                >
+                  <Heart className="h-5 w-5 text-rose-500" />
+                  <span>Saved Rentals</span>
+                </Link>
+
+                <Link
+                  to="/alerts"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className={`flex items-center space-x-2.5 h-[48px] px-4 rounded-xl text-sm font-semibold transition-all ${
+                    isActive("/alerts") ? "bg-emerald-50 text-emerald-800" : "text-stone-700 hover:bg-stone-50"
+                  }`}
+                >
+                  <Bell className="h-5 w-5 text-primary-600" />
+                  <span>Search Alerts</span>
+                </Link>
+              </>
+            )}
+
+            {profile.role === "admin" && (
+              <Link
+                to="/admin"
+                onClick={() => setMobileMenuOpen(false)}
+                className={`flex items-center space-x-2.5 h-[48px] px-4 rounded-xl text-sm font-semibold transition-all ${
+                  isActive("/admin") ? "bg-emerald-50 text-emerald-800" : "text-stone-700 hover:bg-stone-50"
+                }`}
+              >
+                <span>🔐</span>
+                <span>Admin Panel</span>
+              </Link>
+            )}
+
+            {/* Dividers & Common sections */}
+            <div className="border-t border-[#F3F4F6] my-2"></div>
+
+            <Link
+              to="/"
+              onClick={() => setMobileMenuOpen(false)}
+              className="flex items-center space-x-2.5 h-[48px] px-4 rounded-xl text-sm font-semibold text-stone-700 hover:bg-stone-50 transition-all"
+            >
+              <span className="text-base">🏠</span>
+              <span>Browse Rentals</span>
+            </Link>
+
+            <div className="border-t border-[#F3F4F6] my-2"></div>
+
+            {/* User Info & Sign out */}
+            <div className="flex items-center justify-between p-3.5 bg-stone-50 rounded-xl">
+              <div className="flex items-center space-x-3">
+                {profile.avatar_url ? (
+                  <img
+                    src={profile.avatar_url}
+                    alt={profile.full_name}
+                    className="h-10 w-10 rounded-full object-cover border border-stone-200"
+                    referrerPolicy="no-referrer"
+                  />
+                ) : (
+                  <div className="flex h-9 w-9 items-center justify-center rounded-full bg-stone-200 text-stone-700 font-bold">
+                    {profile.full_name?.charAt(0) || "U"}
+                  </div>
+                )}
+                <div>
+                  <p className="text-xs font-semibold text-stone-400">
+                    Logged in as
+                  </p>
+                  <p className="text-sm font-bold text-stone-800 leading-tight">
+                    {profile.full_name}
+                  </p>
+                </div>
               </div>
             </div>
+
             <button
               onClick={() => {
                 setMobileMenuOpen(false);
                 handleSignOut();
               }}
-              className="flex items-center space-x-1.5 p-2 rounded-lg text-red-600 hover:bg-red-50 text-sm font-medium"
+              className="w-full flex items-center space-x-2.5 h-[48px] px-4 rounded-xl text-sm font-bold text-red-600 hover:bg-red-50 transition-all"
             >
-              <LogOut className="h-4 w-4" />
+              <span className="text-base">🚪</span>
               <span>Sign Out</span>
             </button>
           </div>

@@ -1,4 +1,4 @@
-import React, { useState, useRef, DragEvent, ChangeEvent } from "react";
+import React, { useState, useEffect, useRef, DragEvent, ChangeEvent } from "react";
 import { uploadListingPhoto, deleteListingPhoto } from "../lib/storage";
 import { Loader2, X, AlertCircle, RefreshCw } from "lucide-react";
 
@@ -16,6 +16,67 @@ interface UploadingFile {
   error: boolean;
   file: File;
 }
+
+const ImageSpecs: React.FC<{ url: string }> = ({ url }) => {
+  const [resolution, setResolution] = useState<string>("Loading...");
+  const [sizeStr, setSizeStr] = useState<string>("Loading...");
+  const [isLowQuality, setIsLowQuality] = useState(false);
+  const [isLarge, setIsLarge] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    const img = new Image();
+    img.onload = () => {
+      if (!active) return;
+      const w = img.naturalWidth;
+      const h = img.naturalHeight;
+      setResolution(`${w}×${h}`);
+      if (w < 600 || h < 600) {
+        setIsLowQuality(true);
+      }
+      
+      // Attempt to probe file size
+      fetch(url, { method: "HEAD" })
+        .then((res) => {
+          const bytes = res.headers.get("content-length");
+          if (bytes) {
+            const sizeKb = Math.round(parseInt(bytes) / 1024);
+            setSizeStr(sizeKb > 1024 ? `${(sizeKb / 1024).toFixed(1)} MB` : `${sizeKb} KB`);
+            if (sizeKb > 4096) setIsLarge(true);
+            if (sizeKb < 50) setIsLowQuality(true);
+          } else {
+            throw new Error("No size header");
+          }
+        })
+        .catch(() => {
+          // Fallback estimation (JPEG/PNG typical compressed size)
+          const estimatedBytes = w * h * 0.18;
+          const sizeKb = Math.round(estimatedBytes / 1024);
+          setSizeStr(sizeKb > 1024 ? `${(sizeKb / 1024).toFixed(1)} MB` : `${sizeKb} KB`);
+          if (sizeKb > 4096) setIsLarge(true);
+          if (sizeKb < 50) setIsLowQuality(true);
+        });
+    };
+    img.src = url;
+    return () => {
+      active = false;
+    };
+  }, [url]);
+
+  return (
+    <div className="mt-1 bg-stone-50 p-1 px-1.5 rounded border border-stone-200/60 flex flex-col space-y-0.5 text-[10px] text-stone-500">
+      <div className="flex justify-between items-center gap-1">
+        <span>Size: <strong className={isLarge ? "text-red-600" : "text-emerald-700"}>{sizeStr}</strong></span>
+        <span>Res: <strong>{resolution}</strong></span>
+      </div>
+      {isLowQuality && (
+        <span className="text-amber-600 font-bold flex items-center mt-0.5 text-[9px]">
+          ⚠️ Low quality image
+        </span>
+      )}
+    </div>
+  );
+};
 
 export const PhotoUpload: React.FC<PhotoUploadProps> = ({
   propertyId,
@@ -246,39 +307,42 @@ export const PhotoUpload: React.FC<PhotoUploadProps> = ({
             <span className="text-[10px] text-gray-400 italic">Drag-and-drop handles the order. First image is always COVER.</span>
           </div>
 
-          <div className="grid grid-cols-3 gap-2" id="uploaded-photos-grid">
+          <div className="grid grid-cols-3 gap-3" id="uploaded-photos-grid">
             {photos.map((url, index) => {
               const isCover = index === 0;
               return (
                 <div
                   key={url}
-                  className={`relative rounded-lg overflow-hidden aspect-square border ${
-                    isCover ? "col-span-2 row-span-2 border-green-500 shadow-md" : "border-gray-200"
+                  className={`flex flex-col bg-white border rounded-xl p-1.5 ${
+                    isCover ? "col-span-2 shadow-sm border-green-600" : "border-stone-200"
                   }`}
                 >
-                  <img
-                    src={url}
-                    alt={`Property photo ${index + 1}`}
-                    className="w-full h-full object-cover"
-                    referrerPolicy="no-referrer"
-                  />
+                  <div className="relative rounded-lg overflow-hidden aspect-square bg-stone-50">
+                    <img
+                      src={url}
+                      alt={`Property photo ${index + 1}`}
+                      className="w-full h-full object-cover"
+                      referrerPolicy="no-referrer"
+                    />
 
-                  {/* Cover Badge */}
-                  {isCover && (
-                    <span className="absolute bottom-2 left-2 bg-green-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider shadow-sm">
-                      COVER
-                    </span>
-                  )}
+                    {/* Cover Badge */}
+                    {isCover && (
+                      <span className="absolute bottom-2 left-2 bg-green-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider shadow-sm">
+                        COVER
+                      </span>
+                    )}
 
-                  {/* Remove Button */}
-                  <button
-                    type="button"
-                    onClick={() => handleRemovePhoto(index)}
-                    className="absolute top-1 right-1 bg-white hover:bg-red-50 text-gray-800 hover:text-red-600 p-1 rounded-full shadow-md transition active:scale-95"
-                    title="Remove Photo"
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
+                    {/* Remove Button */}
+                    <button
+                      type="button"
+                      onClick={() => handleRemovePhoto(index)}
+                      className="absolute top-1 right-1 bg-white hover:bg-red-50 text-gray-800 hover:text-red-600 p-1 rounded-full shadow-md transition active:scale-95"
+                      title="Remove Photo"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+                  <ImageSpecs url={url} />
                 </div>
               );
             })}
