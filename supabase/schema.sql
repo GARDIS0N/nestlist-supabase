@@ -273,3 +273,31 @@ returns void language sql as $$
   set view_count = view_count + 1
   where id = p_id;
 $$;
+
+-- Google OAuth new user profile handler
+create or replace function public.handle_new_user()
+returns trigger language plpgsql security definer as $$
+begin
+  insert into public.profiles (id, full_name, avatar_url, email, role)
+  values (
+    new.id,
+    coalesce(new.raw_user_meta_data->>'full_name', new.raw_user_meta_data->>'name', ''),
+    coalesce(new.raw_user_meta_data->>'avatar_url', new.raw_user_meta_data->>'picture', ''),
+    new.email,
+    new.raw_user_meta_data->>'role'
+  )
+  on conflict (id) do update
+  set
+    full_name = coalesce(public.profiles.full_name, excluded.full_name),
+    avatar_url = coalesce(public.profiles.avatar_url, excluded.avatar_url),
+    email = coalesce(public.profiles.email, excluded.email);
+  return new;
+end;
+$$;
+
+-- Trigger to run this automatically on auth.users insert
+drop trigger if exists on_auth_user_created on auth.users;
+create trigger on_auth_user_created
+  after insert on auth.users
+  for each row execute function public.handle_new_user();
+

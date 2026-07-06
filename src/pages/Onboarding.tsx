@@ -7,9 +7,21 @@ export const Onboarding: React.FC = () => {
   const navigate = useNavigate();
 
   const [role, setRole] = useState<"tenant" | "landlord">("tenant");
+  const [fullName, setFullName] = useState("");
   const [phone, setPhone] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (profile) {
+      if (profile.full_name && !fullName) {
+        setFullName(profile.full_name);
+      }
+      if (profile.phone && !phone) {
+        setPhone(profile.phone);
+      }
+    }
+  }, [profile]);
 
   useEffect(() => {
     // If profile already has a role, redirect immediately
@@ -34,7 +46,7 @@ export const Onboarding: React.FC = () => {
     setLoading(true);
     setError(null);
 
-    const { error: err } = await updateProfile({ role, phone });
+    const { error: err } = await updateProfile({ role, phone, full_name: fullName });
     setLoading(false);
 
     if (err) {
@@ -178,6 +190,37 @@ export const Onboarding: React.FC = () => {
                 I have property to list
               </span>
             </button>
+          </div>
+
+          <div style={{ marginBottom: "16px" }}>
+            <label
+              style={{
+                display: "block",
+                fontSize: "13px",
+                fontWeight: "600",
+                color: "#4B5563",
+                marginBottom: "6px",
+              }}
+            >
+              Full Name
+            </label>
+            <input
+              type="text"
+              value={fullName}
+              onChange={(e) => setFullName(e.target.value)}
+              placeholder="e.g. John Doe"
+              required
+              style={{
+                width: "100%",
+                padding: "12px 14px",
+                border: "1px solid #E2E5DF",
+                borderRadius: "10px",
+                fontSize: "14px",
+                outline: "none",
+                boxSizing: "border-box",
+                fontFamily: "inherit",
+              }}
+            />
           </div>
 
           <div style={{ marginBottom: "16px" }}>
