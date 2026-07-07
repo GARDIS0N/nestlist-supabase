@@ -153,17 +153,19 @@ export default function App() {
           {/* Humble Branding Footer */}
           <footer className="bg-stone-900 text-stone-400 border-t border-stone-800 text-xs py-8 text-center mt-12">
             <div className="max-w-7xl mx-auto px-4 space-y-2">
-              <p className="font-bold text-stone-300">Nestlist Rental Platforms Limited</p>
-              <p className="text-stone-500">
+              <p className="font-bold text-white">Nestlist Rental Platforms Limited</p>
+              <p className="text-white/60">
                 Connecting Landlords and Tenants across Nairobi, Kiambu, Nakuru, Kisumu, and Mombasa.
               </p>
-              <div className="flex justify-center space-x-4 text-stone-500 text-[11px] font-medium pt-1">
-                <Link to="/privacy" className="hover:text-primary-500 hover:underline transition">Privacy Policy</Link>
-                <span>•</span>
-                <span className="text-stone-600">Terms of Service</span>
+              <div className="flex justify-center space-x-4 text-white/60 text-[11px] font-medium pt-1">
+                <Link to="/privacy" className="text-[#34D399] hover:text-white hover:underline transition">Privacy Policy</Link>
+                <span>·</span>
+                <span className="text-[#34D399] hover:text-white cursor-pointer hover:underline transition">Terms of Service</span>
+                <span>·</span>
+                <span className="text-[#34D399] hover:text-[#34D399] select-all">Support: support@nestlist.com</span>
               </div>
-              <p className="text-[10px] text-stone-600 pt-1">
-                All Rights Reserved © 2026. Powered by Safaricom Daraja & Africa's Talking API integrations.
+              <p className="text-[10.5px] text-white/40 pt-1">
+                © 2026 Nestlist Rental Platforms Limited · Nairobi, Kenya · Secure payments via M-Pesa
               </p>
             </div>
           </footer>

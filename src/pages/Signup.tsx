@@ -73,6 +73,9 @@ export const Signup: React.FC = () => {
           email: email.trim().toLowerCase(),
           role: role || 'tenant',
           is_active: true,
+        }, {
+          onConflict: 'id',
+          ignoreDuplicates: false
         });
         navigate('/onboarding');
       } else {

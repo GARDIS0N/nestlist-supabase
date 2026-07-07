@@ -6,7 +6,7 @@ import {
   Shield, Landmark, Users, Home, RefreshCw, Check, X, 
   Loader2, ArrowLeft, Calendar, Coins, MapPin, User, Mail, 
   Phone, Eye, Power, AlertCircle, FileText, CheckCircle2,
-  Download, Bell, Clock, Trash, AlertTriangle, ShieldCheck
+  Download, Bell, Clock, Trash, AlertTriangle, ShieldCheck, Search
 } from "lucide-react";
 
 export const AdminPanel: React.FC = () => {
@@ -30,6 +30,7 @@ export const AdminPanel: React.FC = () => {
   const [activityLimit, setActivityLimit] = useState(5);
   const [lastUpdated, setLastUpdated] = useState<string>("");
   const [isPulling, setIsPulling] = useState(false);
+  const [listingsError, setListingsError] = useState<string | null>(null);
 
   // Stats State
   const [stats, setStats] = useState({
@@ -94,21 +95,30 @@ export const AdminPanel: React.FC = () => {
   };
 
   const fetchAllListings = async () => {
+    setListingsError(null);
     try {
       const { data, error } = await supabase
         .from('properties')
         .select(`
           *,
-          profiles!landlord_id(full_name, phone),
-          listing_payments(status, mpesa_code, amount)
+          profiles!landlord_id (
+            id,
+            full_name,
+            phone,
+            email
+          )
         `)
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
-      setAllListings(data || []);
+      if (error) {
+        console.error('Admin listings error:', error);
+        setListingsError(error.message);
+      } else {
+        setAllListings(data || []);
+      }
     } catch (err: any) {
       console.error("Failed to fetch listings:", err);
-      showToast("Error loading listings: " + err.message, "error");
+      setListingsError(err.message || "Failed to load listings");
     }
   };
 
@@ -131,26 +141,33 @@ export const AdminPanel: React.FC = () => {
     try {
       const [
         { data: profilesData },
-        { data: paymentsData }
+        { data: paymentsData },
+        { data: propertiesData }
       ] = await Promise.all([
         supabase.from('profiles')
           .select('id, full_name, role, created_at')
           .order('created_at', { ascending: false })
-          .limit(10),
+          .limit(15),
         supabase.from('listing_payments')
-          .select('id, mpesa_code, status, created_at, properties(title)')
+          .select('id, mpesa_code, status, created_at, landlord_id, properties(title)')
           .order('created_at', { ascending: false })
-          .limit(10)
+          .limit(15),
+        supabase.from('properties')
+          .select('id, title, landlord_id, expires_at, created_at')
+          .order('created_at', { ascending: false })
+          .limit(15)
       ]);
 
       const activities: any[] = [];
 
       profilesData?.forEach((p: any) => {
+        const eventType = p.role === 'landlord' ? 'landlord_registered' : 'tenant_registered';
         activities.push({
-          id: `user-${p.id}`,
-          type: 'user',
-          text: `${p.full_name || 'A new user'} registered as ${p.role ? p.role.charAt(0).toUpperCase() + p.role.slice(1) : 'Tenant'}`,
-          color: 'blue',
+          id: `user-${p.id}-${p.created_at}`,
+          userId: p.id,
+          eventType,
+          boldName: p.full_name || 'A new user',
+          boldRole: p.role ? p.role.charAt(0).toUpperCase() + p.role.slice(1) : 'Tenant',
           timestamp: new Date(p.created_at)
         });
       });
@@ -159,33 +176,69 @@ export const AdminPanel: React.FC = () => {
         if (pm.status === 'pending') {
           activities.push({
             id: `payment-sub-${pm.id}`,
-            type: 'payment_pending',
-            text: `Payment ${pm.mpesa_code || 'code'} submitted for ${pm.properties?.title || 'a property'}`,
-            color: 'gold',
+            userId: pm.landlord_id,
+            eventType: 'payment_submitted',
+            title: pm.properties?.title || 'a property',
+            mpesaCode: pm.mpesa_code || 'code',
             timestamp: new Date(pm.created_at)
           });
         } else if (pm.status === 'confirmed') {
           activities.push({
             id: `payment-live-${pm.id}`,
-            type: 'payment_verified',
-            text: `Listing '${pm.properties?.title || 'property'}' went LIVE`,
-            color: 'green',
+            userId: pm.landlord_id,
+            eventType: 'listing_live',
+            title: pm.properties?.title || 'property',
+            timestamp: new Date(pm.created_at)
+          });
+          activities.push({
+            id: `payment-verified-${pm.id}`,
+            userId: pm.landlord_id,
+            eventType: 'payment_verified',
+            mpesaCode: pm.mpesa_code || 'code',
             timestamp: new Date(pm.created_at)
           });
         } else if (pm.status === 'failed') {
           activities.push({
             id: `payment-fail-${pm.id}`,
-            type: 'payment_failed',
-            text: `Payment ${pm.mpesa_code || 'code'} was rejected`,
-            color: 'red',
+            userId: pm.landlord_id,
+            eventType: 'payment_rejected',
+            mpesaCode: pm.mpesa_code || 'code',
             timestamp: new Date(pm.created_at)
+          });
+        }
+      });
+
+      propertiesData?.forEach((p: any) => {
+        const now = new Date();
+        const hasExpiry = p.expires_at ? new Date(p.expires_at) : null;
+        if (hasExpiry && hasExpiry < now) {
+          activities.push({
+            id: `prop-expired-${p.id}`,
+            userId: p.landlord_id,
+            eventType: 'listing_expired',
+            title: p.title,
+            timestamp: hasExpiry
           });
         }
       });
 
       // Sort combined array by timestamp desc
       activities.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
-      setRecentActivities(activities);
+
+      // Deduplicate: if same user_id + same event_type within 60 seconds, only show once.
+      const deduplicated: any[] = [];
+      for (const act of activities) {
+        const isDuplicate = deduplicated.some(item => 
+          item.userId === act.userId && 
+          item.eventType === act.eventType && 
+          Math.abs(item.timestamp.getTime() - act.timestamp.getTime()) < 60000
+        );
+        if (!isDuplicate) {
+          deduplicated.push(act);
+        }
+      }
+
+      setRecentActivities(deduplicated);
     } catch (err) {
       console.error("Failed to load recent activity:", err);
     }
@@ -194,12 +247,13 @@ export const AdminPanel: React.FC = () => {
   // Consolidated loading handler based on active tab
   const refreshData = async () => {
     setLoading(true);
+    setListingsError(null);
 
     try {
       const [
-        { count: listings },
-        { count: pending },
-        { count: users },
+        { count: activeCount },
+        { count: pendingCount },
+        { count: usersCount },
         { data: payments },
       ] = await Promise.all([
         supabase.from('properties')
@@ -221,11 +275,11 @@ export const AdminPanel: React.FC = () => {
 
       setStats({
         totalRevenue: revenue,
-        activeListings: listings || 0,
-        pendingPayments: pending || 0,
-        totalUsers: users || 0,
+        activeListings: activeCount || 0,
+        pendingPayments: pendingCount || 0,
+        totalUsers: usersCount || 0,
       });
-      setLastUpdated(new Date().toLocaleTimeString("en-KE"));
+      setLastUpdated(new Date().toLocaleTimeString("en-KE", { hour: '2-digit', minute: '2-digit' }));
     } catch (err) {
       console.error("Failed to load statistics:", err);
     }
@@ -248,6 +302,14 @@ export const AdminPanel: React.FC = () => {
     }
   }, [profile]);
 
+  // Auto-refresh every 60 seconds if admin has pending payments > 0
+  useEffect(() => {
+    if (stats.pendingPayments > 0) {
+      const interval = setInterval(refreshData, 60000);
+      return () => clearInterval(interval);
+    }
+  }, [stats.pendingPayments]);
+
   // Real-time notification subscription for new pending payments
   useEffect(() => {
     const channel = supabase
@@ -261,12 +323,10 @@ export const AdminPanel: React.FC = () => {
           filter: 'status=eq.pending'
         },
         (payload) => {
-          // Show toast notification
           showToast(
             '🆕 New payment submitted! ' + payload.new.mpesa_code,
             'info'
           );
-          // Refresh data automatically
           refreshData();
         }
       )
@@ -445,7 +505,6 @@ export const AdminPanel: React.FC = () => {
     }
   };
 
-  // Scroll to active payments view when notification bell clicked
   const handleBellClick = () => {
     setActiveTab("payments");
     const el = document.getElementById("admin-segmented-tabs");
@@ -473,7 +532,6 @@ export const AdminPanel: React.FC = () => {
     a.click();
   };
 
-  // Export Users action
   const handleExportUsers = () => {
     const dataToExport = filteredUsers.map(u => ({
       Name: u.full_name || '',
@@ -488,7 +546,6 @@ export const AdminPanel: React.FC = () => {
     showToast("Users exported successfully!", "success");
   };
 
-  // Export Payments action
   const handleExportPayments = async () => {
     try {
       showToast("Preparing CSV export...", "info");
@@ -532,7 +589,6 @@ export const AdminPanel: React.FC = () => {
     }
   };
 
-  // Helper: Format Time Ago
   const formatTimeAgo = (date: Date) => {
     const seconds = Math.floor((new Date().getTime() - date.getTime()) / 1000);
     if (seconds < 5) return "just now";
@@ -567,9 +623,7 @@ export const AdminPanel: React.FC = () => {
         return !!property.rejection_reason || property.payment_status === "rejected";
       }
       if (listingFilter === "pending") {
-        // Look at database property details or its listing_payments pending state
-        const hasPendingPayment = property.listing_payments?.some((p: any) => p.status === 'pending');
-        return hasPendingPayment || (!property.is_active && !property.rejection_reason && (!hasExpiry || hasExpiry >= now));
+        return !property.is_active && !property.rejection_reason && (!hasExpiry || hasExpiry >= now);
       }
     }
     return true;
@@ -595,7 +649,6 @@ export const AdminPanel: React.FC = () => {
     return true;
   });
 
-  // Helper to determine accurate payment status for any property
   const getPropertyStatusDetails = (property: any) => {
     const now = new Date();
     const hasExpiry = property.expires_at ? new Date(property.expires_at) : null;
@@ -608,12 +661,96 @@ export const AdminPanel: React.FC = () => {
     if (property.rejection_reason || property.payment_status === "rejected") {
       return { label: "Rejected", bg: "bg-red-100 text-red-800 border-red-200" };
     }
-    // Check associated payments
-    const hasPending = property.listing_payments?.some((p: any) => p.status === 'pending');
-    if (hasPending || property.payment_status === "pending_verification") {
+    if (property.payment_status === "pending_verification") {
       return { label: "Pending Verification", bg: "bg-amber-100 text-amber-800 border-amber-200" };
     }
     return { label: "Unpaid", bg: "bg-rose-100 text-rose-800 border-rose-200" };
+  };
+
+  const getPillCount = (f: "all" | "active" | "pending" | "expired" | "rejected") => {
+    const now = new Date();
+    return allListings.filter(property => {
+      if (f === "all") return true;
+      const hasExpiry = property.expires_at ? new Date(property.expires_at) : null;
+      if (f === "active") {
+        return property.is_active && (!hasExpiry || hasExpiry >= now);
+      }
+      if (f === "expired") {
+        return hasExpiry && hasExpiry < now;
+      }
+      if (f === "rejected") {
+        return !!property.rejection_reason || property.payment_status === "rejected";
+      }
+      if (f === "pending") {
+        return !property.is_active && !property.rejection_reason && (!hasExpiry || hasExpiry >= now);
+      }
+      return true;
+    }).length;
+  };
+
+  const getActivityStyle = (type: string) => {
+    switch(type) {
+      case 'listing_live':
+        return { dot: '#1E6B4A', icon: '🏠' }; 
+      case 'landlord_registered':
+        return { dot: '#1E6B4A', icon: '🔑' }; 
+      case 'tenant_registered':
+        return { dot: '#3B82F6', icon: '🔍' }; 
+      case 'payment_submitted':
+        return { dot: '#D97706', icon: '💳' }; 
+      case 'payment_verified':
+        return { dot: '#1E6B4A', icon: '✅' }; 
+      case 'payment_rejected':
+        return { dot: '#DC2626', icon: '❌' }; 
+      case 'listing_expired':
+        return { dot: '#9CA3AF', icon: '⏰' }; 
+      default:
+        return { dot: '#9CA3AF', icon: '📋' };
+    }
+  };
+
+  const renderActivityText = (item: any) => {
+    switch(item.eventType) {
+      case 'listing_live':
+        return (
+          <span>
+            Listing '<span className="font-bold text-[#1E6B4A]">{item.title}</span>' went <span className="font-bold text-emerald-700">LIVE</span>
+          </span>
+        );
+      case 'landlord_registered':
+      case 'tenant_registered':
+        return (
+          <span>
+            <span className="font-semibold text-stone-900">{item.boldName}</span> registered as <strong className="font-bold text-emerald-700">{item.boldRole}</strong>
+          </span>
+        );
+      case 'payment_submitted':
+        return (
+          <span>
+            Payment <span className="font-mono font-bold text-amber-700 bg-amber-50 px-1 py-0.5 rounded border border-amber-200">{item.mpesaCode}</span> submitted for <span className="font-semibold text-stone-900">'{item.title}'</span>
+          </span>
+        );
+      case 'payment_verified':
+        return (
+          <span>
+            Payment <span className="font-mono font-bold text-emerald-800 bg-emerald-50 px-1 py-0.5 rounded border border-emerald-200">{item.mpesaCode}</span> was verified
+          </span>
+        );
+      case 'payment_rejected':
+        return (
+          <span>
+            Payment <span className="font-mono font-bold text-red-800 bg-red-50 px-1 py-0.5 rounded border border-red-200">{item.mpesaCode}</span> was rejected
+          </span>
+        );
+      case 'listing_expired':
+        return (
+          <span>
+            Listing <span className="font-semibold text-stone-700">'{item.title}'</span> has <span className="text-stone-500 font-semibold">expired</span>
+          </span>
+        );
+      default:
+        return <span>{item.text || 'System event'}</span>;
+    }
   };
 
   return (
@@ -656,7 +793,7 @@ export const AdminPanel: React.FC = () => {
       {/* Main bounded container of exactly max-width 900px, centered with 16px padding */}
       <div className="max-w-[900px] mx-auto pt-8 px-4" id="admin-panel-page">
         
-        {/* ==================== CHANGE 1: HEADER BANNER ==================== */}
+        {/* HEADER BANNER */}
         <div 
           style={{
             background: 'linear-gradient(135deg, #0A4D2E, #1E6B4A)',
@@ -685,11 +822,11 @@ export const AdminPanel: React.FC = () => {
                 <Shield className="h-7 w-7 text-white" />
               </div>
               <div>
-                <h1 className="text-[22px] font-bold text-white font-serif leading-none flex items-center gap-2">
+                <h1 className="text-[22px] font-bold text-white leading-none flex items-center gap-2">
                   Nestlist Admin Hub
                 </h1>
                 <p className="text-white/60 text-xs mt-1.5 font-medium">Verified Administrator Terminal</p>
-                <p className="text-white/60 text-xs font-mono">Managed by gardisonkirui11@gmail.com</p>
+                <p className="text-white/60 text-xs font-mono">Managed by {profile?.email || "gardisonkirui11@gmail.com"}</p>
               </div>
             </div>
             
@@ -739,7 +876,7 @@ export const AdminPanel: React.FC = () => {
           </div>
         </div>
 
-        {/* ==================== CHANGE 2: STATS CARDS ROW ==================== */}
+        {/* STATS CARDS ROW */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
           {/* Card 1 — Total Revenue */}
           <div 
@@ -748,12 +885,14 @@ export const AdminPanel: React.FC = () => {
           >
             <div className="flex items-center justify-between mb-2">
               <span className="text-xs font-bold text-stone-500 uppercase">Total Revenue</span>
-              <div className="h-8 w-8 rounded-full bg-emerald-50 border border-emerald-100 flex items-center justify-center text-sm">
+              <div className="h-8 w-8 rounded-full bg-[#F0FDF4] border border-emerald-100 flex items-center justify-center text-sm">
                 💰
               </div>
             </div>
             <div>
-              <p className="text-base sm:text-lg font-bold text-stone-900 font-mono">KES {stats.totalRevenue.toLocaleString()}</p>
+              <p className="text-base sm:text-lg font-bold font-mono" style={{ color: '#1E6B4A' }}>
+                KES {stats.totalRevenue.toLocaleString()}
+              </p>
               <p className="text-[11px] text-stone-400 mt-0.5">All time</p>
             </div>
           </div>
@@ -765,12 +904,14 @@ export const AdminPanel: React.FC = () => {
           >
             <div className="flex items-center justify-between mb-2">
               <span className="text-xs font-bold text-stone-500 uppercase">Active Listings</span>
-              <div className="h-8 w-8 rounded-full bg-green-50 border border-green-100 flex items-center justify-center text-sm">
+              <div className="h-8 w-8 rounded-full bg-[#DCFCE7] border border-green-100 flex items-center justify-center text-sm">
                 🏠
               </div>
             </div>
             <div>
-              <p className="text-base sm:text-lg font-bold text-stone-900 font-mono">{stats.activeListings}</p>
+              <p className="text-base sm:text-lg font-bold font-mono" style={{ color: '#2D9E6B' }}>
+                {stats.activeListings}
+              </p>
               <p className="text-[11px] text-stone-400 mt-0.5">Currently live</p>
             </div>
           </div>
@@ -778,22 +919,22 @@ export const AdminPanel: React.FC = () => {
           {/* Card 3 — Pending Payments */}
           <div 
             className={`bg-white border border-[#E2EAE6] rounded-xl p-4 shadow-sm flex flex-col justify-between transition hover:shadow-md ${
-              stats.pendingPayments > 0 ? "animate-pulse border-red-200" : ""
+              stats.pendingPayments > 0 ? "animate-pulse border-amber-300" : ""
             }`}
             style={{ 
-              borderTop: stats.pendingPayments > 0 ? '3px solid #DC2626' : '3px solid #D97706' 
+              borderTop: '3px solid #D97706' 
             }}
           >
             <div className="flex items-center justify-between mb-2">
               <span className="text-xs font-bold text-stone-500 uppercase">Pending Review</span>
-              <div className={`h-8 w-8 rounded-full flex items-center justify-center text-sm ${
-                stats.pendingPayments > 0 ? "bg-red-50 text-red-700 animate-bounce" : "bg-amber-50 text-amber-700"
-              }`}>
+              <div className="h-8 w-8 rounded-full bg-[#FEF3C7] flex items-center justify-center text-sm">
                 ⏳
               </div>
             </div>
             <div>
-              <p className="text-base sm:text-lg font-bold text-stone-900 font-mono">{stats.pendingPayments}</p>
+              <p className="text-base sm:text-lg font-bold font-mono" style={{ color: '#D97706' }}>
+                {stats.pendingPayments}
+              </p>
               <p className="text-[11px] text-stone-400 mt-0.5">Awaiting verification</p>
             </div>
           </div>
@@ -805,51 +946,71 @@ export const AdminPanel: React.FC = () => {
           >
             <div className="flex items-center justify-between mb-2">
               <span className="text-xs font-bold text-stone-500 uppercase">Registered Users</span>
-              <div className="h-8 w-8 rounded-full bg-teal-50 border border-teal-100 flex items-center justify-center text-sm">
+              <div className="h-8 w-8 rounded-full bg-[#F0FDF4] border border-emerald-100 flex items-center justify-center text-sm">
                 👥
               </div>
             </div>
             <div>
-              <p className="text-base sm:text-lg font-bold text-stone-900 font-mono">{stats.totalUsers}</p>
+              <p className="text-base sm:text-lg font-bold font-mono" style={{ color: '#0A4D2E' }}>
+                {stats.totalUsers}
+              </p>
               <p className="text-[11px] text-stone-400 mt-0.5">Landlords & tenants</p>
             </div>
           </div>
         </div>
 
-        {/* ==================== CHANGE 9: RECENT ACTIVITY FEED ==================== */}
+        {/* RECENT ACTIVITY FEED */}
         <div className="bg-white border border-[#E2EAE6] rounded-2xl p-5 mb-8 shadow-sm">
-          <div className="flex items-center gap-2 mb-4">
-            <Clock className="h-4 w-4 text-[#1E6B4A]" />
-            <h2 className="text-xs font-bold text-stone-800 uppercase tracking-wider">Recent Activity</h2>
+          <div className="flex justify-between items-center mb-4 border-b border-stone-100 pb-3">
+            <div className="flex flex-col">
+              <h2 className="text-xs font-black text-stone-500 uppercase tracking-wider">
+                RECENT ACTIVITY • {recentActivities.length} events logged
+              </h2>
+              <span className="text-[11px] text-stone-400 mt-0.5">Last updated: {lastUpdated || "never"}</span>
+            </div>
+            <button
+              onClick={refreshData}
+              disabled={loading}
+              className="h-8 w-8 rounded-full border border-stone-200 hover:bg-stone-50 text-stone-600 flex items-center justify-center transition active:scale-95 cursor-pointer disabled:opacity-40"
+              title="Refresh Activity"
+            >
+              <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+            </button>
           </div>
           
           {recentActivities.length === 0 ? (
-            <p className="text-xs text-stone-400">No recent activities available.</p>
+            <p className="text-xs text-stone-400 py-4 text-center">No recent activities logged today.</p>
           ) : (
             <div className="divide-y divide-stone-100">
-              {recentActivities.slice(0, activityLimit).map((item) => (
-                <div key={item.id} className="py-2.5 flex items-start gap-3 text-xs">
-                  {/* Dot color indicator */}
-                  <span className={`h-2.5 w-2.5 rounded-full mt-1.5 shrink-0 ${
-                    item.color === 'green' ? 'bg-emerald-500' :
-                    item.color === 'gold' ? 'bg-amber-500' :
-                    item.color === 'red' ? 'bg-red-500' : 'bg-blue-500'
-                  }`} />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-stone-700 font-medium">{item.text}</p>
+              {recentActivities.slice(0, activityLimit).map((item) => {
+                const style = getActivityStyle(item.eventType);
+                return (
+                  <div key={item.id} className="py-2.5 flex items-start gap-3">
+                    {/* Left: Circle Dot + Emoji Stack */}
+                    <div className="flex flex-col items-center gap-1 shrink-0 pt-0.5">
+                      <span className="h-2 w-2 rounded-full" style={{ backgroundColor: style.dot }} />
+                      <span className="text-sm shrink-0">{style.icon}</span>
+                    </div>
+
+                    {/* Center: Wording with bold components */}
+                    <div className="flex-1 min-w-0 text-sm text-stone-700 leading-relaxed">
+                      {renderActivityText(item)}
+                    </div>
+
+                    {/* Right: Time Ago */}
+                    <span className="text-[11px] text-stone-400 font-mono shrink-0 self-start pt-1">
+                      {formatTimeAgo(item.timestamp)}
+                    </span>
                   </div>
-                  <span className="text-[10px] text-stone-400 font-mono shrink-0">
-                    {formatTimeAgo(item.timestamp)}
-                  </span>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
 
           {recentActivities.length > 5 && activityLimit === 5 && (
             <button
               onClick={() => setActivityLimit(15)}
-              className="text-xs text-[#1E6B4A] font-bold mt-3 hover:underline flex items-center gap-1 cursor-pointer"
+              className="text-xs text-[#1E6B4A] font-bold mt-4 hover:underline flex items-center gap-1 cursor-pointer"
             >
               View all activity →
             </button>
@@ -857,33 +1018,33 @@ export const AdminPanel: React.FC = () => {
           {activityLimit > 5 && (
             <button
               onClick={() => setActivityLimit(5)}
-              className="text-xs text-[#1E6B4A] font-bold mt-3 hover:underline flex items-center gap-1 cursor-pointer"
+              className="text-xs text-[#1E6B4A] font-bold mt-4 hover:underline flex items-center gap-1 cursor-pointer"
             >
               Collapse activity feed ↑
             </button>
           )}
         </div>
 
-        {/* ==================== CHANGE 3 & 10: STICKY TAB NAVIGATION ==================== */}
+        {/* STICKY TAB NAVIGATION */}
         <div 
           className="sticky top-[64px] z-40 bg-white border border-[#E2EAE6] rounded-xl p-1 flex gap-1 mb-6 shadow-sm"
           id="admin-segmented-tabs"
         >
           <button
             onClick={() => setActiveTab("payments")}
-            className={`flex-1 py-2.5 px-2 rounded-lg font-bold text-[13px] transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+            className={`flex-1 py-2.5 px-1.5 rounded-lg font-bold text-xs sm:text-sm transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
               activeTab === "payments" 
-                ? "bg-[#F0FDF4] text-[#1E6B4A] border-b-2 border-[#1E6B4A]" 
+                ? "bg-[#F0FDF4] text-[#1E6B4A] shadow-[0_1px_4px_rgba(30,107,74,0.1)] border border-emerald-100" 
                 : "bg-transparent text-[#4B5E54] hover:bg-[#FAFAF8]"
             }`}
             id="tab-btn-pending-payments"
           >
             <span className="text-base shrink-0">🏛</span>
-            <span className="hidden sm:inline">Pending</span>
+            <span>Pending</span>
             <span className={`text-[10px] font-black rounded-full px-2 py-0.5 leading-none ${
               stats.pendingPayments > 0
                 ? "bg-red-100 text-red-700 animate-pulse"
-                : "bg-green-100 text-green-700"
+                : "bg-[#F0FDF4] text-green-700"
             }`}>
               {stats.pendingPayments}
             </span>
@@ -891,38 +1052,38 @@ export const AdminPanel: React.FC = () => {
 
           <button
             onClick={() => setActiveTab("listings")}
-            className={`flex-1 py-2.5 px-2 rounded-lg font-bold text-[13px] transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+            className={`flex-1 py-2.5 px-1.5 rounded-lg font-bold text-xs sm:text-sm transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
               activeTab === "listings" 
-                ? "bg-[#F0FDF4] text-[#1E6B4A] border-b-2 border-[#1E6B4A]" 
+                ? "bg-[#F0FDF4] text-[#1E6B4A] shadow-[0_1px_4px_rgba(30,107,74,0.1)] border border-emerald-100" 
                 : "bg-transparent text-[#4B5E54] hover:bg-[#FAFAF8]"
             }`}
             id="tab-btn-all-listings"
           >
             <span className="text-base shrink-0">🏠</span>
-            <span className="hidden sm:inline">Listings</span>
-            <span className="text-[10px] bg-gray-100 text-gray-600 rounded-full px-2 py-0.5 leading-none font-bold">
-              {stats.activeListings}
+            <span>Listings</span>
+            <span className="text-[10px] bg-stone-100 text-stone-600 rounded-full px-2 py-0.5 leading-none font-bold">
+              {allListings.length}
             </span>
           </button>
 
           <button
             onClick={() => setActiveTab("users")}
-            className={`flex-1 py-2.5 px-2 rounded-lg font-bold text-[13px] transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+            className={`flex-1 py-2.5 px-1.5 rounded-lg font-bold text-xs sm:text-sm transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
               activeTab === "users" 
-                ? "bg-[#F0FDF4] text-[#1E6B4A] border-b-2 border-[#1E6B4A]" 
+                ? "bg-[#F0FDF4] text-[#1E6B4A] shadow-[0_1px_4px_rgba(30,107,74,0.1)] border border-emerald-100" 
                 : "bg-transparent text-[#4B5E54] hover:bg-[#FAFAF8]"
             }`}
             id="tab-btn-all-users"
           >
             <span className="text-base shrink-0">👥</span>
-            <span className="hidden sm:inline">Users</span>
-            <span className="text-[10px] bg-green-100 text-green-700 rounded-full px-2 py-0.5 leading-none font-bold">
+            <span>Users</span>
+            <span className="text-[10px] bg-stone-100 text-stone-600 rounded-full px-2 py-0.5 leading-none font-bold">
               {stats.totalUsers}
             </span>
           </button>
         </div>
 
-        {/* ==================== MAIN TAB RENDER SPACE ==================== */}
+        {/* MAIN TAB RENDER SPACE */}
         {loading ? (
           <div className="flex flex-col items-center justify-center py-20 bg-white border border-stone-200/80 rounded-2xl shadow-xs">
             <Loader2 className="h-8 w-8 animate-spin text-emerald-700 mb-3" />
@@ -931,11 +1092,11 @@ export const AdminPanel: React.FC = () => {
         ) : (
           <div id="admin-tab-content-container">
             
-            {/* ==================== TAB 1: PENDING PAYMENTS ==================== */}
+            {/* TAB 1: PENDING PAYMENTS */}
             {activeTab === "payments" && (
               <div>
                 {pendingPayments.length === 0 ? (
-                  /* PENDING PAYMENTS EMPTY STATE (Change 4) */
+                  /* PENDING PAYMENTS EMPTY STATE */
                   <div className="text-center py-12 px-6 bg-white border border-stone-200/80 rounded-2xl shadow-xs animate-fade-in" id="empty-payments-state">
                     <style>{`
                       @keyframes pulseCheck {
@@ -979,7 +1140,7 @@ export const AdminPanel: React.FC = () => {
                     </div>
 
                     {pendingPayments.map((payment) => (
-                      /* Payment Card (Change 5 & 10) */
+                      /* Payment Card */
                       <div 
                         key={payment.id} 
                         style={{
@@ -1069,205 +1230,262 @@ export const AdminPanel: React.FC = () => {
               </div>
             )}
 
-            {/* ==================== TAB 2: ALL LISTINGS ==================== */}
+            {/* TAB 2: ALL LISTINGS */}
             {activeTab === "listings" && (
               <div className="animate-fade-in" id="all-listings-tab">
                 
-                {/* Search Bar & Status Filter Row (Change 6) */}
+                {/* Search Bar & Status Filter Row */}
                 <div className="bg-white border border-[#E2EAE6] rounded-2xl p-4 mb-4 shadow-sm space-y-3">
-                  <div className="flex flex-col sm:flex-row gap-3">
+                  <div className="relative w-full">
+                    <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-stone-400" />
                     <input 
                       type="text"
-                      placeholder="🔍 Search by title or landlord..."
+                      placeholder="Search by title or landlord name..."
                       value={listingSearch}
                       onChange={(e) => setListingSearch(e.target.value)}
                       style={{ border: '1.5px solid #E2EAE6' }}
-                      className="w-full p-2.5 px-3.5 rounded-xl text-sm focus:border-[#1E6B4A] focus:ring-1 focus:ring-[#1E6B4A] outline-none transition"
+                      className="w-full p-2.5 pl-10 pr-4 rounded-xl text-sm focus:border-[#1E6B4A] focus:ring-1 focus:ring-[#1E6B4A] outline-none transition"
                     />
-                    
-                    <button
-                      onClick={handleExportPayments}
-                      className="flex items-center justify-center gap-1.5 border border-stone-200 bg-white hover:bg-stone-50 text-stone-600 hover:text-stone-900 font-semibold text-xs py-2.5 px-4 rounded-xl transition active:scale-95 cursor-pointer shrink-0"
-                    >
-                      <Download className="h-3.5 w-3.5" />
-                      <span>Export Payments CSV</span>
-                    </button>
                   </div>
 
-                  {/* Filter Pills */}
-                  <div className="flex flex-wrap gap-2 pt-1 border-t border-stone-100">
-                    {(["all", "active", "pending", "expired", "rejected"] as const).map((f) => (
-                      <button
-                        key={f}
-                        onClick={() => setListingFilter(f)}
-                        className={`text-xs px-3 py-1.5 rounded-full border transition font-bold cursor-pointer ${
-                          listingFilter === f
-                            ? "bg-[#1E6B4A] border-[#1E6B4A] text-white"
-                            : "bg-stone-50 border-stone-200 text-stone-600 hover:bg-stone-100"
-                        }`}
-                      >
-                        {f.charAt(0).toUpperCase() + f.slice(1)}
-                      </button>
-                    ))}
+                  <div className="flex items-center justify-between gap-3 overflow-x-auto pb-1">
+                    <div className="flex gap-2 overflow-x-auto scrollbar-none pb-0.5">
+                      {(["all", "active", "pending", "expired", "rejected"] as const).map((f) => (
+                        <button
+                          key={f}
+                          onClick={() => setListingFilter(f)}
+                          style={{
+                            borderRadius: '24px',
+                            whiteSpace: 'nowrap',
+                            transition: 'all 0.15s'
+                          }}
+                          className={`text-[13px] font-semibold px-3.5 py-1.5 border cursor-pointer ${
+                            listingFilter === f
+                              ? f === "all" ? "bg-[#0F1A14] border-[#0F1A14] text-white"
+                                : f === "active" ? "bg-[#1E6B4A] border-[#1E6B4A] text-white"
+                                : f === "pending" ? "bg-[#D97706] border-[#D97706] text-white"
+                                : f === "expired" ? "bg-[#6B7280] border-[#6B7280] text-white"
+                                : "bg-[#DC2626] border-[#DC2626] text-white"
+                              : "bg-white border-[#E2EAE6] text-[#4B5E54] hover:bg-[#FAFAF8]"
+                          }`}
+                        >
+                          {f === "all" ? "All" : f.charAt(0).toUpperCase() + f.slice(1)} ({getPillCount(f)})
+                        </button>
+                      ))}
+                    </div>
+
+                    <button
+                      onClick={handleExportPayments}
+                      className="flex items-center gap-1 border border-[#E2EAE6] bg-white hover:bg-stone-50 text-[#4B5E54] hover:text-stone-900 font-semibold text-xs py-1.5 px-3 rounded-lg transition active:scale-95 cursor-pointer shrink-0"
+                    >
+                      <Download className="h-3.5 w-3.5" />
+                      <span>Export</span>
+                    </button>
                   </div>
                 </div>
 
-                {filteredListings.length === 0 ? (
-                  /* ALL LISTINGS EMPTY STATE (Change 4) */
-                  <div className="text-center py-16 px-4 bg-white border border-stone-200/80 rounded-2xl shadow-xs" id="empty-listings-state">
-                    <span className="text-5xl block mb-3">🏠</span>
-                    <h3 className="text-base font-bold text-stone-900">No listings yet</h3>
-                    <p className="text-stone-500 text-xs mt-1 max-w-sm mx-auto leading-relaxed">
-                      Listings will appear here after landlords post and pay their listing fee.
+                {/* Database Fail Error Banner */}
+                {listingsError ? (
+                  <div className="bg-[#FEF2F2] border border-[#FECACA] rounded-[10px] p-4 text-center text-rose-800 space-y-3">
+                    <p className="font-bold text-sm">❌ Failed to load listings: {listingsError}</p>
+                    <button
+                      onClick={fetchAllListings}
+                      className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-lg transition active:scale-95 cursor-pointer"
+                    >
+                      Retry
+                    </button>
+                  </div>
+                ) : allListings.length === 0 ? (
+                  /* TRULY EMPTY LISTINGS STATE */
+                  <div className="text-center py-16 px-6 bg-white border border-[#E2EAE6] rounded-2xl shadow-sm animate-fade-in" id="empty-listings-state">
+                    <span className="text-[48px] block mb-3">🏠</span>
+                    <h3 className="text-lg font-extrabold text-stone-900">No listings yet</h3>
+                    <p className="text-stone-500 text-sm mt-1 max-w-sm mx-auto leading-relaxed">
+                      Listings appear here after landlords post and pay their listing fee.
                     </p>
                     
-                    {/* Gold Hint Box */}
-                    <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mt-6 text-left max-w-md mx-auto">
-                      <p className="text-xs text-amber-800 leading-relaxed font-semibold">
-                        💡 Listing fees: From KES 100 for Single Room to KES 1,500 for 5+ Bedroom
+                    {/* Gold info box */}
+                    <div className="bg-[#FFFBEB] border border-[#FDE68A] border-l-4 border-l-[#D97706] rounded-xl p-3.5 mt-6 text-left max-w-md mx-auto">
+                      <p className="text-xs text-[#92400E] leading-relaxed font-semibold">
+                        💡 Listing fees: KES 100 (Single Room) to KES 1,500 (5+ Bedroom) · 30 days active
                       </p>
                     </div>
                   </div>
+                ) : filteredListings.length === 0 ? (
+                  /* FILTERED EMPTY LISTINGS STATE */
+                  <div className="text-center py-16 px-6 bg-white border border-[#E2EAE6] rounded-2xl shadow-sm animate-fade-in" id="empty-filtered-listings-state">
+                    <span className="text-[48px] block mb-3">🔍</span>
+                    <h3 className="text-lg font-extrabold text-stone-900">No {listingFilter !== "all" ? listingFilter : ""} listings found</h3>
+                    <p className="text-stone-500 text-sm mt-1 max-w-sm mx-auto leading-relaxed">
+                      Try selecting 'All' to see all listings or search with other keywords
+                    </p>
+                    <button
+                      onClick={() => { setListingFilter("all"); setListingSearch(""); }}
+                      className="mt-4 px-4 py-2 bg-[#1E6B4A] hover:bg-[#154D34] text-white text-xs font-bold rounded-lg transition active:scale-95 cursor-pointer"
+                    >
+                      Clear Filter
+                    </button>
+                  </div>
                 ) : (
-                  <div className="bg-white border border-stone-200/80 rounded-2xl shadow-sm overflow-hidden" id="all-listings-table-container">
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-left border-collapse text-xs sm:text-sm">
-                        <thead className="bg-stone-50 text-stone-400 font-bold uppercase border-b border-stone-200">
-                          <tr>
-                            <th className="p-4">Thumbnail & Title</th>
-                            <th className="p-4">Type & Location</th>
-                            <th className="p-4 text-right">Price</th>
-                            <th className="p-4">Landlord</th>
-                            <th className="p-4">Status</th>
-                            <th className="p-4 text-right">Actions</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-stone-150 text-stone-700 font-medium">
-                          {filteredListings.map((property) => {
-                            const statDetails = getPropertyStatusDetails(property);
-                            const hasThumbnail = property.images && property.images.length > 0;
-                            return (
-                              <tr key={property.id} className="hover:bg-stone-50/40">
-                                {/* Thumbnail & Title */}
-                                <td className="p-4">
-                                  <div className="flex items-center gap-3">
-                                    {hasThumbnail ? (
-                                      <img 
-                                        src={property.images[0]} 
-                                        alt={property.title} 
-                                        className="h-12 w-12 rounded-lg object-cover border border-stone-200"
-                                        referrerPolicy="no-referrer"
-                                      />
-                                    ) : (
-                                      <div className="h-12 w-12 rounded-lg bg-emerald-50 text-emerald-800 border border-emerald-100 flex items-center justify-center text-xl shrink-0">
-                                        🏠
-                                      </div>
-                                    )}
-                                    <div className="min-w-0">
-                                      <p className="font-bold text-stone-900 truncate max-w-[180px]" title={property.title}>
-                                        {property.title}
-                                      </p>
-                                      <span className="block text-[10px] text-stone-400 font-mono mt-0.5">
-                                        ID: {property.id.slice(0, 8)}
-                                      </span>
-                                    </div>
-                                  </div>
-                                </td>
+                  /* RENDER RESPONSIVE FLEX LIST */
+                  <div className="space-y-2.5" id="listings-list-container">
+                    {filteredListings.map((property) => {
+                      const statDetails = getPropertyStatusDetails(property);
+                      const hasThumbnail = property.images && property.images.length > 0;
+                      const priceVal = parseFloat(property.price) || 0;
+                      
+                      let badgeStyle = "bg-[#F0FDF4] border-[#DCFCE7] text-[#15803D]";
+                      if (statDetails.label === "Verified & Active") {
+                        badgeStyle = "bg-[#F0FDF4] border-[#DCFCE7] text-[#15803D]";
+                      } else if (statDetails.label === "Pending Verification") {
+                        badgeStyle = "bg-[#FFFBEB] border-[#FEF3C7] text-[#B45309]";
+                      } else if (statDetails.label === "Rejected") {
+                        badgeStyle = "bg-[#FEF2F2] border-[#FEE2E2] text-[#B91C1C]";
+                      } else if (statDetails.label === "Expired") {
+                        badgeStyle = "bg-[#F9FAFB] border-[#E5E7EB] text-[#4B5563]";
+                      } else if (statDetails.label === "Unpaid") {
+                        badgeStyle = "bg-[#FEF2F2] border-[#FEE2E2] text-[#B91C1C]";
+                      }
 
-                                {/* Type & Location */}
-                                <td className="p-4">
-                                  <p className="capitalize text-stone-800">{property.type?.replace('_', ' ') || 'Unit'}</p>
-                                  <span className="block text-[10px] text-stone-400 line-clamp-1">{property.location || 'N/A'}</span>
-                                </td>
-
-                                {/* Price */}
-                                <td className="p-4 text-right font-mono font-bold text-emerald-800">
-                                  KSh {(parseFloat(property.price) || 0).toLocaleString()}
-                                </td>
-
-                                {/* Landlord Details */}
-                                <td className="p-4">
-                                  <p className="font-bold text-stone-900 text-xs">{property.profiles?.full_name || 'N/A'}</p>
-                                  <span className="block text-[10px] text-stone-400 font-mono">{property.profiles?.phone || 'N/A'}</span>
-                                </td>
-
-                                {/* Status Badge */}
-                                <td className="p-4">
-                                  <span className={`inline-block text-[9.5px] font-black uppercase px-2.5 py-0.5 rounded-full border ${statDetails.bg}`}>
-                                    {statDetails.label}
-                                  </span>
-                                </td>
-
-                                {/* Actions (Suspend / Restore) */}
-                                <td className="p-4 text-right">
-                                  <button
-                                    onClick={() => handleToggleListingActive(property)}
-                                    disabled={listingActionLoading === property.id}
-                                    className={`inline-flex items-center gap-1 font-semibold text-xs py-1.5 px-3 rounded-full border transition cursor-pointer active:scale-95 disabled:opacity-50 ${
-                                      property.is_active
-                                        ? "bg-rose-50 hover:bg-rose-100 border-rose-200/40 text-rose-700"
-                                        : "bg-emerald-50 hover:bg-emerald-100 border-emerald-200/40 text-emerald-800"
-                                    }`}
-                                  >
-                                    {listingActionLoading === property.id ? (
-                                      <Loader2 className="h-3 w-3 animate-spin shrink-0" />
-                                    ) : (
-                                      <Power className="h-3 w-3 shrink-0" />
-                                    )}
-                                    <span>{property.is_active ? "Suspend" : "Restore"}</span>
-                                  </button>
-                                </td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
-                    </div>
+                      return (
+                        <div 
+                          key={property.id}
+                          className="bg-white border border-[#E2EAE6] rounded-xl p-3 sm:p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 hover:shadow-sm transition duration-150"
+                        >
+                          <div className="flex items-center gap-3">
+                            {hasThumbnail ? (
+                              <img 
+                                src={property.images[0]} 
+                                alt={property.title} 
+                                className="h-12 w-12 rounded-[10px] object-cover shrink-0 border border-stone-200"
+                                referrerPolicy="no-referrer"
+                              />
+                            ) : (
+                              <div className="h-12 w-12 rounded-[10px] bg-[#F0FDF4] border border-emerald-100 flex items-center justify-center text-xl shrink-0">
+                                🏠
+                              </div>
+                            )}
+                            <div className="min-w-0">
+                              <h4 className="font-bold text-sm sm:text-base text-stone-900 truncate max-w-[200px] sm:max-w-md" title={property.title}>
+                                {property.title}
+                              </h4>
+                              <p className="text-xs text-stone-500 mt-0.5 flex flex-wrap gap-x-2 gap-y-0.5 items-center">
+                                <span className="capitalize font-semibold">{property.type?.replace('_', ' ')}</span>
+                                <span className="text-stone-300">•</span>
+                                <span>📍 {property.location}</span>
+                              </p>
+                              <p className="text-xs text-[#1E6B4A] font-semibold mt-0.5">
+                                Landlord: {property.profiles?.full_name || "N/A"} ({property.profiles?.phone || "N/A"})
+                              </p>
+                            </div>
+                          </div>
+                          
+                          <div className="flex sm:flex-col items-start sm:items-end justify-between sm:justify-center gap-2 pt-2.5 sm:pt-0 border-t border-stone-100 sm:border-0 shrink-0">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className={`inline-block text-[10px] font-extrabold uppercase px-2 py-0.5 rounded border ${badgeStyle}`}>
+                                {statDetails.label}
+                              </span>
+                              <span className="font-extrabold text-sm sm:text-base text-[#1E6B4A] font-mono">
+                                KES {priceVal.toLocaleString()}
+                              </span>
+                            </div>
+                            
+                            <div className="flex items-center gap-2 self-end sm:self-auto">
+                              <Link
+                                to={`/property/${property.id}`}
+                                target="_blank"
+                                className="p-1.5 rounded-lg border border-stone-200 hover:bg-stone-50 text-stone-600 transition"
+                                title="View listing details"
+                              >
+                                <Eye className="h-4 w-4 shrink-0" />
+                              </Link>
+                              
+                              <button
+                                onClick={() => handleToggleListingActive(property)}
+                                disabled={listingActionLoading === property.id}
+                                className={`inline-flex items-center gap-1 font-bold text-xs py-1.5 px-3 rounded-lg border transition cursor-pointer active:scale-95 disabled:opacity-50 ${
+                                  property.is_active
+                                    ? "bg-[#FEF2F2] border-[#FECACA] text-[#DC2626] hover:bg-[#DC2626] hover:text-white"
+                                    : "bg-[#E6F4EA] border-[#A7F3D0] text-[#137333] hover:bg-[#137333] hover:text-white"
+                                }`}
+                              >
+                                {listingActionLoading === property.id ? (
+                                  <Loader2 className="h-3 w-3 animate-spin shrink-0" />
+                                ) : (
+                                  <Power className="h-3 w-3 shrink-0" />
+                                )}
+                                <span>{property.is_active ? "Suspend" : "Restore"}</span>
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 )}
               </div>
             )}
 
-            {/* ==================== TAB 3: ALL USERS ==================== */}
+            {/* TAB 3: ALL USERS */}
             {activeTab === "users" && (
               <div className="animate-fade-in" id="all-users-tab">
                 
-                {/* Search Bar & Export Row (Change 7) */}
+                {/* Search Bar & Export Row */}
                 <div className="bg-white border border-[#E2EAE6] rounded-2xl p-4 mb-4 shadow-sm space-y-3">
-                  <div className="flex flex-col sm:flex-row gap-3">
+                  <div className="relative w-full">
+                    <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-stone-400" />
                     <input 
                       type="text"
-                      placeholder="🔍 Search by name, email or phone..."
+                      placeholder="Search by name, email or phone..."
                       value={userSearch}
                       onChange={(e) => setUserSearch(e.target.value)}
                       style={{ border: '1.5px solid #E2EAE6' }}
-                      className="w-full p-2.5 px-3.5 rounded-xl text-sm focus:border-[#1E6B4A] focus:ring-1 focus:ring-[#1E6B4A] outline-none transition"
+                      className="w-full p-2.5 pl-10 pr-4 rounded-xl text-sm focus:border-[#1E6B4A] focus:ring-1 focus:ring-[#1E6B4A] outline-none transition"
                     />
-                    
-                    <button
-                      onClick={handleExportUsers}
-                      className="flex items-center justify-center gap-1.5 border border-stone-200 bg-white hover:bg-stone-50 text-stone-600 hover:text-stone-900 font-semibold text-xs py-2.5 px-4 rounded-xl transition active:scale-95 cursor-pointer shrink-0"
-                    >
-                      <Download className="h-3.5 w-3.5" />
-                      <span>Export Users CSV</span>
-                    </button>
                   </div>
 
-                  {/* Filter Pills */}
-                  <div className="flex flex-wrap gap-2 pt-1 border-t border-stone-100">
-                    {["all", "landlords", "caretakers", "agents", "tenants", "admins"].map((role) => (
-                      <button
-                        key={role}
-                        onClick={() => setUserRoleFilter(role)}
-                        className={`text-xs px-3 py-1.5 rounded-full border transition font-bold cursor-pointer ${
-                          userRoleFilter === role
-                            ? "bg-[#1E6B4A] border-[#1E6B4A] text-white"
-                            : "bg-stone-50 border-stone-200 text-stone-600 hover:bg-stone-100"
-                        }`}
-                      >
-                        {role.charAt(0).toUpperCase() + role.slice(1)}
-                      </button>
-                    ))}
+                  <div className="flex items-center justify-between gap-3 overflow-x-auto pb-1">
+                    <div className="flex gap-2 overflow-x-auto scrollbar-none pb-0.5">
+                      {["all", "landlords", "caretakers", "agents", "tenants", "admins"].map((role) => {
+                        const count = allUsers.filter(u => {
+                          if (role === "all") return true;
+                          const r = u.role?.toLowerCase() || 'tenant';
+                          if (role === "landlords" && r !== "landlord") return false;
+                          if (role === "caretakers" && r !== "caretaker") return false;
+                          if (role === "agents" && r !== "agent") return false;
+                          if (role === "tenants" && r !== "tenant") return false;
+                          if (role === "admins" && r !== "admin" && r !== "superadmin") return false;
+                          return true;
+                        }).length;
+
+                        return (
+                          <button
+                            key={role}
+                            onClick={() => setUserRoleFilter(role)}
+                            style={{
+                              borderRadius: '24px',
+                              whiteSpace: 'nowrap',
+                              transition: 'all 0.15s'
+                            }}
+                            className={`text-[13px] font-semibold px-3.5 py-1.5 border cursor-pointer ${
+                              userRoleFilter === role
+                                ? "bg-[#1E6B4A] border-[#1E6B4A] text-white"
+                                : "bg-white border-[#E2EAE6] text-[#4B5E54] hover:bg-[#FAFAF8]"
+                            }`}
+                          >
+                            {role === "all" ? "All" : role.charAt(0).toUpperCase() + role.slice(1)} ({count})
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    <button
+                      onClick={handleExportUsers}
+                      className="flex items-center gap-1 border border-[#E2EAE6] bg-white hover:bg-stone-50 text-[#4B5E54] hover:text-stone-900 font-semibold text-xs py-1.5 px-3 rounded-lg transition active:scale-95 cursor-pointer shrink-0"
+                    >
+                      <Download className="h-3.5 w-3.5" />
+                      <span>Export</span>
+                    </button>
                   </div>
                 </div>
 
@@ -1276,8 +1494,8 @@ export const AdminPanel: React.FC = () => {
                 </div>
 
                 {filteredUsers.length === 0 ? (
-                  /* ALL USERS EMPTY STATE (Change 4) */
-                  <div className="text-center py-16 px-4 bg-white border border-stone-200/80 rounded-2xl shadow-xs" id="empty-users-state">
+                  /* ALL USERS EMPTY STATE */
+                  <div className="text-center py-16 px-4 bg-white border border-stone-200/80 rounded-2xl shadow-xs animate-fade-in" id="empty-users-state">
                     <span className="text-5xl block mb-3">👥</span>
                     <h3 className="text-base font-bold text-stone-900">No users registered yet</h3>
                     <p className="text-stone-500 text-xs mt-1 max-w-sm mx-auto leading-relaxed">
@@ -1303,7 +1521,6 @@ export const AdminPanel: React.FC = () => {
                             const initial = user.full_name ? user.full_name.charAt(0).toUpperCase() : 'U';
                             const listingCount = allListings.filter(p => p.landlord_id === user.id).length;
 
-                            // Dynamic Role-based styling
                             let roleStyles = { bg: "bg-blue-100 text-blue-700 border-blue-200" };
                             const rLower = user.role?.toLowerCase() || 'tenant';
                             if (rLower === "landlord") roleStyles = { bg: "bg-green-100 text-green-700 border-green-200" };
@@ -1346,7 +1563,7 @@ export const AdminPanel: React.FC = () => {
                                   </div>
                                 </td>
 
-                                {/* Contact & Email (hidden on screens < 380px) */}
+                                {/* Contact & Email */}
                                 <td className="p-4 hidden xs:table-cell">
                                   <div className="space-y-0.5">
                                     <p className="text-xs font-semibold text-stone-700 truncate max-w-[180px]" title={user.email}>{user.email || 'N/A'}</p>
@@ -1411,10 +1628,10 @@ export const AdminPanel: React.FC = () => {
         )}
       </div>
 
-      {/* ==================== VERIFY CONFIRMATION DIALOG MODAL ==================== */}
+      {/* VERIFY CONFIRMATION DIALOG MODAL */}
       {verifyingPayment && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl animate-fade-in border border-stone-200">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl border border-stone-200">
             <div className="flex items-center gap-2.5 text-emerald-700 mb-4">
               <CheckCircle2 className="h-6 w-6" />
               <h3 className="text-lg font-bold">Verify Payment</h3>
@@ -1434,7 +1651,7 @@ export const AdminPanel: React.FC = () => {
               <button
                 onClick={handleApprovePaymentSubmit}
                 disabled={verifyingLoading}
-                className="flex-1 py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white font-semibold text-sm rounded-xl transition flex items-center justify-center gap-1.5 cursor-pointer"
+                className="flex-1 py-2.5 bg-[#1E6B4A] hover:bg-[#154D34] text-white font-semibold text-sm rounded-xl transition flex items-center justify-center gap-1.5 cursor-pointer"
               >
                 {verifyingLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
                 <span>Yes, Verify and Go Live</span>
@@ -1444,11 +1661,11 @@ export const AdminPanel: React.FC = () => {
         </div>
       )}
 
-      {/* ==================== REJECT COMPLAINT MODAL ==================== */}
+      {/* REJECT COMPLAINT MODAL */}
       {rejectingPayment && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl animate-fade-in border border-stone-200">
-            <div className="flex items-center gap-2.5 text-rose-700 mb-4">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl border border-stone-200">
+            <div className="flex items-center gap-2.5 text-[#DC2626] mb-4">
               <AlertCircle className="h-6 w-6" />
               <h3 className="text-lg font-bold">Reject Payment Submission</h3>
             </div>
@@ -1473,7 +1690,7 @@ export const AdminPanel: React.FC = () => {
                     onClick={() => setRejectionReason(reason)}
                     className={`text-xs py-1.5 px-3 rounded-lg border transition-all cursor-pointer ${
                       rejectionReason === reason
-                        ? "bg-rose-50 border-rose-300 text-rose-800 font-bold"
+                        ? "bg-rose-50 border-rose-300 text-[#DC2626] font-bold"
                         : "bg-stone-50 border-stone-200 text-stone-600 hover:bg-stone-100"
                     }`}
                   >
@@ -1503,7 +1720,7 @@ export const AdminPanel: React.FC = () => {
               <button
                 onClick={handleRejectPaymentSubmit}
                 disabled={rejectingLoading || !rejectionReason.trim()}
-                className="flex-1 py-2.5 bg-rose-600 hover:bg-rose-700 disabled:opacity-50 text-white font-semibold text-sm rounded-xl transition flex items-center justify-center gap-1.5 cursor-pointer"
+                className="flex-1 py-2.5 bg-[#DC2626] hover:bg-[#B91C1C] disabled:opacity-50 text-white font-semibold text-sm rounded-xl transition flex items-center justify-center gap-1.5 cursor-pointer"
               >
                 {rejectingLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
                 <span>Reject Payment</span>
