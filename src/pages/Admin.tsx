@@ -76,18 +76,75 @@ export const AdminPanel: React.FC = () => {
   // Data Fetching functions
   const fetchPendingPayments = async () => {
     try {
+      // 1. Try standard implicit join first (most reliable when single foreign key exists)
       const { data, error } = await supabase
         .from('listing_payments')
         .select(`
           *,
           properties(title, type, price, location),
-          profiles!landlord_id(full_name, phone)
+          profiles(full_name, phone)
         `)
         .eq('status', 'pending')
         .order('created_at', { ascending: true });
 
-      if (error) throw error;
-      setPendingPayments(data || []);
+      if (error) {
+        console.warn('Admin pending payments standard join error, trying explicit modifier:', error);
+        
+        // 2. Try explicit modifier
+        const { data: data2, error: error2 } = await supabase
+          .from('listing_payments')
+          .select(`
+            *,
+            properties(title, type, price, location),
+            profiles!landlord_id(full_name, phone)
+          `)
+          .eq('status', 'pending')
+          .order('created_at', { ascending: true });
+
+        if (error2) {
+          console.warn('Admin pending payments explicit modifier error, trying manual resolution:', error2);
+          
+          // 3. Fallback: select listing_payments and then query profiles manually
+          const { data: rawPayments, error: error3 } = await supabase
+            .from('listing_payments')
+            .select('*, properties(title, type, price, location)')
+            .eq('status', 'pending')
+            .order('created_at', { ascending: true });
+
+          if (error3) {
+            throw error3;
+          }
+
+          const payments = rawPayments || [];
+          if (payments.length === 0) {
+            setPendingPayments([]);
+            return;
+          }
+
+          const landlordIds = Array.from(new Set(payments.map((p: any) => p.landlord_id).filter(Boolean)));
+          if (landlordIds.length > 0) {
+            const { data: profilesData, error: profilesError } = await supabase
+              .from('profiles')
+              .select('id, full_name, phone')
+              .in('id', landlordIds);
+
+            if (!profilesError && profilesData) {
+              const profilesMap = new Map(profilesData.map((p: any) => [p.id, p]));
+              const merged = payments.map((p: any) => ({
+                ...p,
+                profiles: profilesMap.get(p.landlord_id) || null
+              }));
+              setPendingPayments(merged);
+              return;
+            }
+          }
+          setPendingPayments(payments.map((p: any) => ({ ...p, profiles: null })));
+        } else {
+          setPendingPayments(data2 || []);
+        }
+      } else {
+        setPendingPayments(data || []);
+      }
     } catch (err: any) {
       console.error("Failed to fetch pending payments:", err);
       showToast("Error loading pending payments: " + err.message, "error");
@@ -97,11 +154,12 @@ export const AdminPanel: React.FC = () => {
   const fetchAllListings = async () => {
     setListingsError(null);
     try {
+      // 1. Try standard implicit profiles join first (most reliable)
       const { data, error } = await supabase
         .from('properties')
         .select(`
           *,
-          profiles!landlord_id (
+          profiles (
             id,
             full_name,
             phone,
@@ -111,8 +169,64 @@ export const AdminPanel: React.FC = () => {
         .order('created_at', { ascending: false });
 
       if (error) {
-        console.error('Admin listings error:', error);
-        setListingsError(error.message);
+        console.warn('Admin listings standard join error, trying explicit modifier:', error);
+        
+        // 2. Try explicit relation qualifier
+        const { data: data2, error: error2 } = await supabase
+          .from('properties')
+          .select(`
+            *,
+            profiles!landlord_id (
+              id,
+              full_name,
+              phone,
+              email
+            )
+          `)
+          .order('created_at', { ascending: false });
+          
+        if (error2) {
+          console.warn('Admin listings explicit modifier error, trying manual resolution:', error2);
+          
+          // 3. Fallback: select properties alone and then query profiles manually
+          const { data: data3, error: error3 } = await supabase
+            .from('properties')
+            .select('*')
+            .order('created_at', { ascending: false });
+            
+          if (error3) {
+            throw error3;
+          }
+          
+          const rawProperties = data3 || [];
+          if (rawProperties.length === 0) {
+            setAllListings([]);
+            return;
+          }
+          
+          const landlordIds = Array.from(new Set(rawProperties.map((p: any) => p.landlord_id).filter(Boolean)));
+          
+          if (landlordIds.length > 0) {
+            const { data: profilesData, error: profilesError } = await supabase
+              .from('profiles')
+              .select('id, full_name, phone, email')
+              .in('id', landlordIds);
+              
+            if (!profilesError && profilesData) {
+              const profilesMap = new Map(profilesData.map((p: any) => [p.id, p]));
+              const merged = rawProperties.map((p: any) => ({
+                ...p,
+                profiles: profilesMap.get(p.landlord_id) || null
+              }));
+              setAllListings(merged);
+              return;
+            }
+          }
+          
+          setAllListings(rawProperties.map((p: any) => ({ ...p, profiles: null })));
+        } else {
+          setAllListings(data2 || []);
+        }
       } else {
         setAllListings(data || []);
       }
@@ -225,9 +339,23 @@ export const AdminPanel: React.FC = () => {
       // Sort combined array by timestamp desc
       activities.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
 
-      // Deduplicate: if same user_id + same event_type within 60 seconds, only show once.
+      // Deduplicate: if same user_id + same event_type within 60 seconds, or multiple registrations of the same user
       const deduplicated: any[] = [];
+      const seenRegistrations = new Set<string>(); // Track seen user ids and names for registration events
+
       for (const act of activities) {
+        const isReg = act.eventType === 'tenant_registered' || act.eventType === 'landlord_registered';
+        
+        if (isReg) {
+          const regKey = act.userId || act.boldName;
+          if (regKey && regKey !== 'A new user') {
+            if (seenRegistrations.has(regKey)) {
+              continue; // Skip duplicate registration event
+            }
+            seenRegistrations.add(regKey);
+          }
+        }
+
         const isDuplicate = deduplicated.some(item => 
           item.userId === act.userId && 
           item.eventType === act.eventType && 
@@ -549,6 +677,25 @@ export const AdminPanel: React.FC = () => {
   const handleExportPayments = async () => {
     try {
       showToast("Preparing CSV export...", "info");
+      
+      const executeExport = (paymentsList: any[]) => {
+        const formatted = paymentsList.map((p: any) => ({
+          "M-Pesa Code": p.mpesa_code || '',
+          "Landlord Name": p.profiles?.full_name || '',
+          Phone: p.profiles?.phone || '',
+          "Property Title": p.properties?.title || '',
+          Type: p.properties?.type || '',
+          Amount: p.amount || 0,
+          Status: p.status || 'pending',
+          "Submission Date": p.created_at ? new Date(p.created_at).toLocaleDateString("en-KE") : '',
+          "Verification Date": p.verified_at ? new Date(p.verified_at).toLocaleDateString("en-KE") : ''
+        }));
+
+        exportToCSV(formatted, 'nestlist_payments_' + new Date().toISOString().split('T')[0]);
+        showToast("Payments exported successfully!", "success");
+      };
+
+      // 1. Try standard implicit join first (most reliable)
       const { data, error } = await supabase
         .from('listing_payments')
         .select(`
@@ -558,31 +705,84 @@ export const AdminPanel: React.FC = () => {
           created_at,
           verified_at,
           properties(title, type),
-          profiles!landlord_id(full_name, phone)
+          profiles(full_name, phone)
         `)
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
+      if (error) {
+        console.warn('Admin export payments standard join error, trying explicit modifier:', error);
+        
+        // 2. Try explicit modifier
+        const { data: data2, error: error2 } = await supabase
+          .from('listing_payments')
+          .select(`
+            mpesa_code,
+            amount,
+            status,
+            created_at,
+            verified_at,
+            properties(title, type),
+            profiles!landlord_id(full_name, phone)
+          `)
+          .order('created_at', { ascending: false });
 
-      if (!data || data.length === 0) {
-        showToast("No payments found to export.", "error");
-        return;
+        if (error2) {
+          console.warn('Admin export payments explicit modifier error, trying manual resolution:', error2);
+          
+          // 3. Fallback: query raw payments and manually map profiles
+          const { data: rawPayments, error: error3 } = await supabase
+            .from('listing_payments')
+            .select(`
+              mpesa_code,
+              amount,
+              status,
+              created_at,
+              verified_at,
+              landlord_id,
+              properties(title, type)
+            `)
+            .order('created_at', { ascending: false });
+
+          if (error3) throw error3;
+
+          const payments = rawPayments || [];
+          if (payments.length === 0) {
+            showToast("No payments found to export.", "error");
+            return;
+          }
+
+          const landlordIds = Array.from(new Set(payments.map((p: any) => p.landlord_id).filter(Boolean)));
+          if (landlordIds.length > 0) {
+            const { data: profilesData, error: profilesError } = await supabase
+              .from('profiles')
+              .select('id, full_name, phone')
+              .in('id', landlordIds);
+
+            if (!profilesError && profilesData) {
+              const profilesMap = new Map(profilesData.map((p: any) => [p.id, p]));
+              const merged = payments.map((p: any) => ({
+                ...p,
+                profiles: profilesMap.get(p.landlord_id) || null
+              }));
+              executeExport(merged);
+              return;
+            }
+          }
+          executeExport(payments.map((p: any) => ({ ...p, profiles: null })));
+        } else {
+          if (!data2 || data2.length === 0) {
+            showToast("No payments found to export.", "error");
+            return;
+          }
+          executeExport(data2);
+        }
+      } else {
+        if (!data || data.length === 0) {
+          showToast("No payments found to export.", "error");
+          return;
+        }
+        executeExport(data);
       }
-
-      const formatted = data.map((p: any) => ({
-        "M-Pesa Code": p.mpesa_code || '',
-        "Landlord Name": p.profiles?.full_name || '',
-        Phone: p.profiles?.phone || '',
-        "Property Title": p.properties?.title || '',
-        Type: p.properties?.type || '',
-        Amount: p.amount || 0,
-        Status: p.status || 'pending',
-        "Submission Date": p.created_at ? new Date(p.created_at).toLocaleDateString("en-KE") : '',
-        "Verification Date": p.verified_at ? new Date(p.verified_at).toLocaleDateString("en-KE") : ''
-      }));
-
-      exportToCSV(formatted, 'nestlist_payments_' + new Date().toISOString().split('T')[0]);
-      showToast("Payments exported successfully!", "success");
     } catch (err: any) {
       console.error(err);
       showToast("Export failed: " + err.message, "error");
