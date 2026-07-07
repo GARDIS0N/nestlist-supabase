@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { supabase } from "../lib/supabase";
 import { PhotoUpload } from "../components/PhotoUpload";
+import { PropertySkeleton } from "../components/PropertySkeleton";
 import { 
   LayoutDashboard, Plus, MessageSquare, Building2, Eye, Check, X, Loader2, 
   CheckCircle, Clock, AlertTriangle, Send, Share2, Edit, Trash2, Copy, 
@@ -773,12 +774,32 @@ export const LandlordDashboard: React.FC = () => {
 
       {/* Main Tab Contents */}
       {loading ? (
-        <div className="flex justify-center py-16">
-          <div className="flex flex-col items-center space-y-2 animate-pulse">
-            <Loader2 className="h-8 w-8 text-emerald-600 animate-spin" />
-            <p className="text-stone-400 text-xs">Loading data...</p>
+        activeTab === "listings" ? (
+          <PropertySkeleton count={properties.length || 3} showActions={true} />
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="border border-stone-200 rounded-xl p-4 bg-white animate-pulse space-y-3">
+                <div className="flex justify-between items-center">
+                  <div className="flex items-center space-x-2.5">
+                    <div className="h-8 w-8 rounded-full bg-stone-200"></div>
+                    <div className="space-y-1">
+                      <div className="h-3 bg-stone-200 rounded w-24"></div>
+                      <div className="h-2 bg-stone-200 rounded w-16"></div>
+                    </div>
+                  </div>
+                  <div className="h-4 bg-stone-200 rounded-full w-14"></div>
+                </div>
+                <div className="h-3 bg-stone-100 rounded w-1/3"></div>
+                <div className="h-8 bg-stone-50 rounded-lg w-full"></div>
+                <div className="flex space-x-2 pt-2">
+                  <div className="h-9 bg-stone-200 rounded-lg flex-1"></div>
+                  <div className="h-9 bg-stone-200 rounded-lg flex-1"></div>
+                </div>
+              </div>
+            ))}
           </div>
-        </div>
+        )
       ) : activeTab === "listings" ? (
         /* MY PROPERTIES TAB */
         <div className="space-y-6">

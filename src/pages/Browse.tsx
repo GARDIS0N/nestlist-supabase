@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { supabase, INITIAL_PROPERTIES, getSupabaseConfig } from "../lib/supabase";
+import { PropertySkeleton } from "../components/PropertySkeleton";
 import { Search, MapPin, Heart, ListFilter, SlidersHorizontal, Grid, X, Info, AlertTriangle, Database } from "lucide-react";
 
 const COUNTIES = ["All Counties", "Nairobi", "Kiambu", "Mombasa", "Kisumu", "Nakuru"];
@@ -472,18 +473,7 @@ export const Browse: React.FC = () => {
 
         {loading ? (
           /* LOADING PLACEHOLDERS */
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {[1, 2, 3, 4, 5, 6].map((i) => (
-              <div key={i} className="bg-white rounded-2xl border border-[#E2EAE6] overflow-hidden space-y-4 animate-pulse">
-                <div className="bg-stone-200 aspect-video w-full"></div>
-                <div className="p-5 space-y-3">
-                  <div className="h-4 bg-stone-200 rounded w-1/3"></div>
-                  <div className="h-6 bg-stone-200 rounded w-3/4"></div>
-                  <div className="h-4 bg-stone-200 rounded w-1/2"></div>
-                </div>
-              </div>
-            ))}
-          </div>
+          <PropertySkeleton count={6} showActions={false} />
         ) : properties.length === 0 ? (
           /* EMPTY STATE */
           <div className="bg-white rounded-2xl border border-[#E2EAE6] py-16 px-4 text-center max-w-xl mx-auto">

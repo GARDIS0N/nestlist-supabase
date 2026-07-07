@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { supabase } from "../lib/supabase";
+import { PropertySkeleton } from "../components/PropertySkeleton";
 import { Heart, MapPin, Loader2, ArrowLeft } from "lucide-react";
 
 export const SavedProperties: React.FC = () => {
@@ -83,12 +84,7 @@ export const SavedProperties: React.FC = () => {
       </div>
 
       {loading ? (
-        <div className="flex justify-center items-center py-20">
-          <div className="flex flex-col items-center space-y-3">
-            <Loader2 className="h-8 w-8 text-primary-600 animate-spin" />
-            <p className="text-stone-400 font-medium text-xs">Loading saved listings...</p>
-          </div>
-        </div>
+        <PropertySkeleton count={3} showActions={false} />
       ) : properties.length === 0 ? (
         /* Empty State */
         <div className="bg-white rounded-2xl border border-stone-200 py-16 px-4 text-center max-w-lg mx-auto shadow-sm">
