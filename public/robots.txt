@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://nestlist.co.ke/sitemap.xml
