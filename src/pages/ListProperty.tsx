@@ -183,6 +183,7 @@ export const ListProperty: React.FC = () => {
           title,
           description,
           location: locationName,
+          estate: locationName.split(",")[0]?.trim() || locationName,
           county: selectedCounty,
           price: parseInt(price) || 0,
           type: selectedType,

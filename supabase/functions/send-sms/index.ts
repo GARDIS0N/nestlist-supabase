@@ -34,10 +34,26 @@ serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
     );
 
-    const { type, phone, data } = (await req.json()) as SmsRequest;
+    const reqBody = await req.json();
+    const { type, data } = reqBody as SmsRequest;
+    let targetPhone = reqBody.phone;
 
-    if (!type || !phone || !data) {
-      return new Response(JSON.stringify({ error: "Missing required fields" }), {
+    // If phone is not provided directly, resolve securely on the server via recipient_id / landlord_id / tenant_id
+    if (!targetPhone && (data?.recipient_id || data?.landlord_id || data?.tenant_id)) {
+      const targetUserId = data.recipient_id || data.landlord_id || data.tenant_id;
+      const { data: userProf } = await supabaseClient
+        .from("profiles")
+        .select("phone")
+        .eq("id", targetUserId)
+        .maybeSingle();
+
+      if (userProf?.phone) {
+        targetPhone = userProf.phone;
+      }
+    }
+
+    if (!type || !targetPhone || !data) {
+      return new Response(JSON.stringify({ error: "Missing required fields (type, phone or valid recipient, data)" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -48,10 +64,10 @@ serve(async (req) => {
 
     switch (type) {
       case "inquiry_received":
-        messageText = `Jambo ${data.landlord_name || "Landlord"}, you have a new inquiry from ${data.tenant_name || "a tenant"} (${data.tenant_phone}) regarding your listing "${data.property_title}": "${data.message || ""}". Reply via Nestlist!`;
+        messageText = `Jambo ${data.landlord_name || "Host"}, you have received a new tenant inquiry regarding your listing "${data.property_title}". Sign in to your Nestlist dashboard to review and unlock the tenant lead!`;
         break;
       case "inquiry_sent":
-        messageText = `Jambo ${data.tenant_name || "Tenant"}, your inquiry for "${data.property_title}" has been sent to the landlord. Their phone is ${data.landlord_phone || "N/A"}. Thank you for choosing Nestlist!`;
+        messageText = `Jambo ${data.tenant_name || "Tenant"}, your inquiry for "${data.property_title}" has been delivered securely to the property host. You will be notified when they reply. Thank you for using Nestlist!`;
         break;
       case "payment_confirmed":
         messageText = `Habari ${data.landlord_name || "Landlord"}, payment of KSh ${data.amount} (Ref: ${data.mpesa_code}) received. Your listing "${data.property_title}" is now ACTIVE for 30 days. Log in to track views!`;
@@ -83,7 +99,7 @@ serve(async (req) => {
     }
 
     // Ensure phone is internationally formatted (+254XXXXXXXXX)
-    let formattedPhone = phone.trim();
+    let formattedPhone = targetPhone.trim();
     if (formattedPhone.startsWith("0")) {
       formattedPhone = "+254" + formattedPhone.substring(1);
     } else if (formattedPhone.startsWith("254") && !formattedPhone.startsWith("+")) {

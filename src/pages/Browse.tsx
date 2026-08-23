@@ -1,11 +1,35 @@
 import React, { useState, useEffect } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { supabase, isSupabaseEnvMissing, getSupabaseConfig } from "../lib/supabase";
 import { PropertySkeleton } from "../components/PropertySkeleton";
-import { Search, MapPin, Heart, ListFilter, SlidersHorizontal, Grid, X, Info, AlertTriangle, Database } from "lucide-react";
+import { UniversityFilterSelect } from "../components/UniversityFilterSelect";
+import { University, KENYAN_UNIVERSITIES, isListingNearUniversity } from "../data/universities";
+import { Search, MapPin, Heart, ListFilter, SlidersHorizontal, Grid, X, Info, AlertTriangle, Database, GraduationCap, Sparkles } from "lucide-react";
 
-const COUNTIES = ["All Counties", "Nairobi", "Kiambu", "Mombasa", "Kisumu", "Nakuru"];
+const COUNTIES = [
+  "All Counties",
+  "Nairobi",
+  "Kiambu",
+  "Nakuru",
+  "Uasin Gishu",
+  "Kisumu",
+  "Mombasa",
+  "Kilifi",
+  "Machakos",
+  "Nyeri",
+  "Kakamega",
+  "Meru",
+  "Tharaka Nithi",
+  "Kajiado",
+  "Bungoma",
+  "Kisii",
+  "Kitui",
+  "Laikipia",
+  "Narok",
+  "Murang'a",
+  "Taita Taveta"
+];
 
 const TYPES = [
   { value: "all", label: "All Types" },
@@ -40,6 +64,7 @@ const AMENITIES_LIST = [
 export const Browse: React.FC = () => {
   const { profile } = useAuth();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const [properties, setProperties] = useState<any[]>([]);
   const [savedPropertyIds, setSavedPropertyIds] = useState<Set<string>>(new Set());
@@ -51,9 +76,16 @@ export const Browse: React.FC = () => {
   const [usingFallback, setUsingFallback] = useState(false);
 
   // Filters State
-  const [search, setSearch] = useState("");
-  const [selectedCounty, setSelectedCounty] = useState("All Counties");
-  const [selectedType, setSelectedType] = useState("all");
+  const [search, setSearch] = useState(searchParams.get("search") || "");
+  const [selectedCounty, setSelectedCounty] = useState(searchParams.get("county") || "All Counties");
+  const [selectedType, setSelectedType] = useState(searchParams.get("type") || "all");
+  const [selectedUniversity, setSelectedUniversity] = useState<University | null>(() => {
+    const uniParam = searchParams.get("university");
+    if (uniParam) {
+      return KENYAN_UNIVERSITIES.find(u => u.id === uniParam || u.short_name?.toLowerCase() === uniParam.toLowerCase()) || null;
+    }
+    return null;
+  });
   const [minPrice, setMinPrice] = useState("");
   const [maxPrice, setMaxPrice] = useState("");
   const [selectedAmenities, setSelectedAmenities] = useState<string[]>([]);
@@ -168,7 +200,15 @@ export const Browse: React.FC = () => {
           (p: any) =>
             p.title.toLowerCase().includes(keyword) ||
             p.location.toLowerCase().includes(keyword) ||
+            (p.estate && p.estate.toLowerCase().includes(keyword)) ||
             (p.description && p.description.toLowerCase().includes(keyword))
+        );
+      }
+
+      // Filter by University proximity (checks estates, campus, location, and keywords)
+      if (selectedUniversity) {
+        filteredData = filteredData.filter((p: any) =>
+          isListingNearUniversity(p, selectedUniversity)
         );
       }
 
@@ -230,7 +270,7 @@ export const Browse: React.FC = () => {
   useEffect(() => {
     setPage(0);
     fetchProperties(0, false);
-  }, [search, selectedCounty, selectedType, minPrice, maxPrice, selectedAmenities]);
+  }, [search, selectedCounty, selectedType, selectedUniversity, minPrice, maxPrice, selectedAmenities]);
 
   useEffect(() => {
     fetchSavedPropertyIds();
@@ -302,6 +342,7 @@ export const Browse: React.FC = () => {
     setSearch("");
     setSelectedCounty("All Counties");
     setSelectedType("all");
+    setSelectedUniversity(null);
     setMinPrice("");
     setMaxPrice("");
     setSelectedAmenities([]);
@@ -321,34 +362,54 @@ export const Browse: React.FC = () => {
         <div className="absolute top-10 left-1/3 w-32 h-32 bg-gold-500/5 rounded-full blur-xl"></div>
 
         <div className="max-w-2xl space-y-3 relative z-10">
-          <span className="bg-gold-500/20 text-[#FFFBEB] border border-gold-400/30 text-xs font-bold uppercase tracking-widest px-3 py-1 rounded-full">
-            Nyumba Popote Kenya
-          </span>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="bg-gold-500/20 text-[#FFFBEB] border border-gold-400/30 text-xs font-bold uppercase tracking-widest px-3 py-1 rounded-full">
+              Nyumba Popote Kenya
+            </span>
+            <span className="bg-white/15 text-white border border-white/20 text-xs font-semibold px-3 py-1 rounded-full flex items-center gap-1.5 backdrop-blur-xs">
+              <GraduationCap className="h-3.5 w-3.5 text-amber-300" />
+              <span>Campus & Student Rentals</span>
+            </span>
+          </div>
           <h1 className="text-2xl sm:text-4xl font-extrabold tracking-tight font-sans">
             Find Your Next Perfect Home
           </h1>
           <p className="text-xs sm:text-base text-stone-300 leading-relaxed max-w-xl">
-            Browse active rentals in Nairobi, Kiambu, Mombasa, Kisumu, and Nakuru. Landlords are fully verified with M-Pesa.
+            Browse verified rentals across Kenya or find student housing near your university or college with curated nearby estates.
           </p>
         </div>
 
         {/* Floating Fast Search Panel */}
-        <div className="mt-8 bg-white text-stone-800 p-3 rounded-xl border border-[#E2EAE6] shadow-xl flex flex-col md:flex-row gap-2 relative z-10 max-w-4xl">
-          <div className="flex-1 relative">
+        <div className="mt-8 bg-white text-stone-800 p-3 rounded-xl border border-[#E2EAE6] shadow-xl flex flex-col md:flex-row gap-2 relative z-10 max-w-5xl items-stretch md:items-center">
+          <div className="flex-1 relative min-w-[200px]">
             <Search className="absolute left-3 top-3 h-5 w-5 text-stone-400" />
             <input
               type="text"
-              placeholder="Search estates, keywords e.g. TRM, Kilimani..."
+              placeholder="Search estates, keywords e.g. TRM, Juja..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="w-full pl-10 pr-4 py-2.5 rounded-lg border-0 focus:outline-none focus:ring-2 focus:ring-[#1E6B4A]/10 text-sm"
             />
           </div>
           
-          <div className="h-px md:h-10 w-full md:w-px bg-stone-200"></div>
+          <div className="h-px md:h-10 w-full md:w-px bg-stone-200 hidden md:block"></div>
+
+          {/* Near University / College Dropdown Filter */}
+          <UniversityFilterSelect
+            selectedUniversityId={selectedUniversity?.id || null}
+            onSelectUniversity={(uni) => {
+              setSelectedUniversity(uni);
+              if (uni && uni.county && selectedCounty === "All Counties") {
+                // Keep County flexible or auto-focus
+              }
+            }}
+            selectedCounty={selectedCounty}
+          />
+
+          <div className="h-px md:h-10 w-full md:w-px bg-stone-200 hidden md:block"></div>
 
           {/* County Selector */}
-          <div className="w-full md:w-48 relative">
+          <div className="w-full md:w-40 relative">
             <MapPin className="absolute left-3 top-3 h-5 w-5 text-stone-400" />
             <select
               value={selectedCounty}
@@ -361,10 +422,10 @@ export const Browse: React.FC = () => {
             </select>
           </div>
 
-          <div className="h-px md:h-10 w-full md:w-px bg-stone-200"></div>
+          <div className="h-px md:h-10 w-full md:w-px bg-stone-200 hidden md:block"></div>
 
           {/* Type Selector */}
-          <div className="w-full md:w-48 relative">
+          <div className="w-full md:w-36 relative">
             <Grid className="absolute left-3 top-3 h-5 w-5 text-stone-400" />
             <select
               value={selectedType}
@@ -377,10 +438,10 @@ export const Browse: React.FC = () => {
             </select>
           </div>
 
-          <div className="flex gap-2">
+          <div className="flex gap-2 shrink-0">
             <button
               onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
-              className="py-2.5 px-4 rounded-lg border border-stone-200 hover:bg-stone-50 text-stone-600 transition flex items-center justify-center space-x-1.5 text-sm"
+              className="py-2.5 px-3.5 rounded-lg border border-stone-200 hover:bg-stone-50 text-stone-600 transition flex items-center justify-center space-x-1.5 text-sm"
               title="Advanced Filters"
             >
               <SlidersHorizontal className="h-4 w-4" />
@@ -389,6 +450,39 @@ export const Browse: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Active University Filter Indicator Banner */}
+      {selectedUniversity && (
+        <div className="bg-emerald-50 border border-emerald-200/80 rounded-2xl p-4 sm:p-5 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 animate-in fade-in slide-in-from-top-2">
+          <div className="flex items-start sm:items-center space-x-3">
+            <div className="p-2.5 bg-[#1E6B4A] text-white rounded-xl shadow-xs shrink-0 mt-0.5 sm:mt-0">
+              <GraduationCap className="h-5 w-5" />
+            </div>
+            <div>
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="font-bold text-stone-900 text-sm sm:text-base">
+                  Listings near {selectedUniversity.name}
+                </span>
+                <span className="px-2 py-0.5 text-[11px] font-bold rounded-md bg-emerald-100 text-[#1E6B4A]">
+                  {selectedUniversity.county} County
+                </span>
+              </div>
+              <p className="text-xs text-stone-600 mt-0.5">
+                <span className="font-semibold text-stone-700">Targeted student estates:</span>{" "}
+                {selectedUniversity.nearby_estates.join(", ")}
+              </p>
+            </div>
+          </div>
+
+          <button
+            onClick={() => setSelectedUniversity(null)}
+            className="inline-flex items-center space-x-1 px-3 py-1.5 rounded-lg bg-white border border-emerald-300 text-xs font-bold text-emerald-900 hover:bg-emerald-100/60 transition self-start sm:self-center shrink-0 shadow-2xs"
+          >
+            <X className="h-3.5 w-3.5" />
+            <span>Clear Campus Filter</span>
+          </button>
+        </div>
+      )}
 
       {/* Advanced Filters Drawer (Collapse view) */}
       {showAdvancedFilters && (

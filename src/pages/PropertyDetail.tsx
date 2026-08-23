@@ -2,8 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { supabase } from "../lib/supabase";
-import { MapPin, Phone, MessageSquare, ChevronLeft, ChevronRight, Check, Heart, Mail, ShieldCheck, ArrowLeft, Loader2, Send, Lock, Key, AlertTriangle, Sparkles } from "lucide-react";
-import UnlockLead from "../components/UnlockLead";
+import { MapPin, MessageSquare, ChevronLeft, ChevronRight, Check, Heart, ShieldCheck, ArrowLeft, Loader2, Send, AlertTriangle, Sparkles, Building2, UserCheck } from "lucide-react";
 import { PropertyGallery } from "../components/PropertyGallery";
 
 export const PropertyDetail: React.FC = () => {
@@ -15,12 +14,6 @@ export const PropertyDetail: React.FC = () => {
   const [landlord, setLandlord] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
   const [isSaved, setIsSaved] = useState(false);
-
-  // Gating & Unlock state
-  const [isUnlocked, setIsUnlocked] = useState(false);
-  const [unlocking, setUnlocking] = useState(false);
-  const [unlockError, setUnlockError] = useState<string | null>(null);
-  const [unlockLeadModalOpen, setUnlockLeadModalOpen] = useState(false);
 
   // Inquiry Modal State
   const [inquiryModalOpen, setInquiryModalOpen] = useState(false);
@@ -64,21 +57,10 @@ export const PropertyDetail: React.FC = () => {
             }
           }
 
-          // Check if property is pay_per_inquiry
-          const isPayPerInquiry = propData.payment_model === 'pay_per_inquiry' || propData.listing_model === 'pay_per_lead' || propData.payment_model === 'pay_per_lead';
-
-          // Check if current user is landlord owner or admin
-          const isLandlordOrAdmin = profile && (profile.id === propData.landlord_id || profile.role === "admin");
-
-          // Landlord contact info is unlocked ONLY for pay_once listings OR if current user is owner/admin
-          const unlockedStatus = !isPayPerInquiry || !!isLandlordOrAdmin;
-
-          setIsUnlocked(unlockedStatus);
-
-          // Fetch landlord profile (include phone & email ONLY if unlocked)
+          // Fetch host profile: strictly non-contact identity fields (id, full_name, avatar_url, role, agency_name)
           const { data: landlordData } = await supabase
             .from("profiles")
-            .select("id, full_name, avatar_url" + (unlockedStatus ? ", phone, email" : ""))
+            .select("id, full_name, avatar_url, role, agency_name")
             .eq("id", propData.landlord_id)
             .maybeSingle();
 
@@ -86,10 +68,10 @@ export const PropertyDetail: React.FC = () => {
             const lData = landlordData as any;
             setLandlord({
               id: lData.id,
-              full_name: lData.full_name || "Landlord",
+              full_name: lData.full_name || "Verified Host",
               avatar_url: lData.avatar_url,
-              phone: unlockedStatus ? lData.phone : null,
-              email: unlockedStatus ? lData.email : null
+              role: lData.role || "landlord",
+              agency_name: lData.agency_name || null
             });
           }
 
@@ -114,103 +96,6 @@ export const PropertyDetail: React.FC = () => {
 
     fetchPropertyDetails();
   }, [id, profile]);
-
-  const handleUnlockContact = async () => {
-    if (!profile) {
-      navigate("/login");
-      return;
-    }
-
-    setUnlocking(true);
-    setUnlockError(null);
-
-    try {
-      if (!property) return;
-
-      // Check if unlock record already exists for this tenant + listing
-      const { data: existingUnlock } = await supabase
-        .from("lead_unlocks")
-        .select("id")
-        .eq("tenant_id", profile.id)
-        .or(`listing_id.eq.${id},property_id.eq.${id}`)
-        .eq("status", "confirmed")
-        .maybeSingle();
-
-      if (existingUnlock) {
-        setIsUnlocked(true);
-        const { data: landlordProf } = await supabase
-          .from("profiles")
-          .select("id, full_name, avatar_url, phone, email")
-          .eq("id", property.landlord_id)
-          .maybeSingle();
-
-        if (landlordProf) {
-          setLandlord({
-            id: landlordProf.id,
-            full_name: landlordProf.full_name || "Landlord",
-            avatar_url: landlordProf.avatar_url,
-            phone: landlordProf.phone,
-            email: landlordProf.email
-          });
-        }
-        return;
-      }
-
-      // Check tenant lead credits
-      const { data: tenantProfile } = await supabase
-        .from("profiles")
-        .select("lead_credits")
-        .eq("id", profile.id)
-        .maybeSingle();
-
-      const credits = Number(tenantProfile?.lead_credits || 0);
-
-      if (credits > 0) {
-        // Deduct 1 credit & create confirmed unlock record
-        await supabase
-          .from("profiles")
-          .update({ lead_credits: credits - 1 })
-          .eq("id", profile.id);
-
-        await supabase
-          .from("lead_unlocks")
-          .insert({
-            tenant_id: profile.id,
-            listing_id: id,
-            property_id: id,
-            landlord_id: property.landlord_id,
-            amount_paid: 0,
-            payment_method: "credit",
-            status: "confirmed"
-          });
-
-        setIsUnlocked(true);
-        const { data: landlordProf } = await supabase
-          .from("profiles")
-          .select("id, full_name, avatar_url, phone, email")
-          .eq("id", property.landlord_id)
-          .maybeSingle();
-
-        if (landlordProf) {
-          setLandlord({
-            id: landlordProf.id,
-            full_name: landlordProf.full_name || "Landlord",
-            avatar_url: landlordProf.avatar_url,
-            phone: landlordProf.phone,
-            email: landlordProf.email
-          });
-        }
-      } else {
-        // 0 lead credits: show unlock modal to purchase/pay
-        setUnlockError("0 lead credits available. Opening payment unlock window...");
-        setUnlockLeadModalOpen(true);
-      }
-    } catch (err: any) {
-      setUnlockError(err.message || "Network error while unlocking contact.");
-    } finally {
-      setUnlocking(false);
-    }
-  };
 
   const handleToggleSave = async () => {
     if (!profile) {
@@ -288,17 +173,15 @@ export const PropertyDetail: React.FC = () => {
 
       if (error) throw error;
 
-      // 3. Notify landlord via SMS
+      // 3. Notify landlord/manager via SMS securely
       try {
         await supabase.functions.invoke("send-sms", {
           body: {
-            type: "inquiry_sent",
-            phone: landlord?.phone,
+            type: "inquiry_received",
             data: {
-              tenant_name: profile.full_name || "A tenant",
+              landlord_id: property.landlord_id,
+              landlord_name: landlord?.full_name || "Host",
               property_title: property.title,
-              tenant_phone: activePhone,
-              message: inquiryMessage.substring(0, 80),
             }
           }
         });
@@ -469,58 +352,39 @@ export const PropertyDetail: React.FC = () => {
                   {landlord.avatar_url ? (
                     <img
                       src={landlord.avatar_url}
-                      alt={landlord.full_name || "Landlord"}
+                      alt={landlord.full_name || "Verified Host"}
                       className="h-11 w-11 rounded-full object-cover border border-primary-200 shadow-xs"
                       referrerPolicy="no-referrer"
                     />
                   ) : (
                     <div className="h-11 w-11 rounded-full bg-primary-50 border border-primary-200 text-primary-900 font-bold flex items-center justify-center text-sm capitalize">
-                      {landlord.full_name?.charAt(0) || "L"}
+                      {landlord.full_name?.charAt(0) || "H"}
                     </div>
                   )}
                   <div>
-                    <h4 className="font-bold text-stone-900 text-sm leading-tight">
-                      {landlord.full_name || "Property Landlord"}
+                    <h4 className="font-bold text-stone-900 text-sm leading-tight flex items-center gap-1.5">
+                      <span>{landlord.full_name || "Verified Host"}</span>
                     </h4>
-                    <p className="text-[10px] text-stone-400 font-bold uppercase tracking-wider mt-0.5">
-                      Verified Owner
+                    <p className="text-[10px] text-stone-500 font-bold uppercase tracking-wider mt-0.5 flex items-center gap-1">
+                      <UserCheck className="h-3 w-3 text-emerald-600" />
+                      <span>{landlord.role === "agent" ? (landlord.agency_name ? `Agent (${landlord.agency_name})` : "Real Estate Agent") : landlord.role === "caretaker" ? "Property Caretaker" : "Verified Landlord"}</span>
                     </p>
                   </div>
                 </div>
 
-                {/* Contact Phone & Email */}
-                {isUnlocked ? (
-                  <div className="space-y-2 text-xs font-semibold text-stone-600 bg-emerald-50/50 border border-emerald-200/60 p-3 rounded-xl">
-                    <div className="flex items-center space-x-2.5 text-emerald-900 font-bold">
-                      <Phone className="h-4 w-4 text-emerald-600" />
-                      <span>{landlord.phone || "No phone listed"}</span>
-                    </div>
-                    {landlord.phone && (
-                      <a
-                        href={`https://wa.me/${landlord.phone.replace(/[^0-9]/g, '')}?text=Jambo%2C%20I%20am%20interested%20in%20your%20property%20listed%20on%20NestList%3A%20${encodeURIComponent(property.title)}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center space-x-1 text-[11px] font-bold text-emerald-700 hover:underline pt-1"
-                      >
-                        <span>Chat via WhatsApp →</span>
-                      </a>
-                    )}
+                <div className="bg-emerald-50/60 border border-emerald-200/80 p-3.5 rounded-xl space-y-2">
+                  <div className="flex items-center space-x-2 text-xs font-bold text-emerald-950">
+                    <Sparkles className="h-4 w-4 text-emerald-600 shrink-0" />
+                    <span>Private & Secure In-App Communication</span>
                   </div>
-                ) : (
-                  <div className="bg-emerald-50/60 border border-emerald-200/80 p-3.5 rounded-xl space-y-2">
-                    <div className="flex items-center space-x-2 text-xs font-bold text-emerald-950">
-                      <Sparkles className="h-4 w-4 text-emerald-600 shrink-0" />
-                      <span>Pay-Per-Inquiry Listing</span>
-                    </div>
-                    <p className="text-[11px] text-emerald-900 leading-relaxed font-medium">
-                      Submit an enquiry for free! The landlord will be notified instantly and will contact you directly via phone or WhatsApp.
-                    </p>
-                  </div>
-                )}
+                  <p className="text-[11px] text-emerald-900 leading-relaxed font-medium">
+                    Host contact numbers are kept private for safety. Send a free enquiry below to schedule viewings or ask questions.
+                  </p>
+                </div>
               </div>
             ) : (
               <div className="bg-stone-50 p-4 rounded-xl border border-stone-200/50 text-center text-stone-400 text-xs">
-                Owner details unretrievable.
+                Host details unretrievable.
               </div>
             )}
 
@@ -528,7 +392,7 @@ export const PropertyDetail: React.FC = () => {
               <div className="flex items-start space-x-2 text-[11px] text-stone-400 font-medium leading-relaxed bg-[#FEF3C7]/40 p-2.5 rounded-lg border border-[#FDE68A]/50">
                 <ShieldCheck className="h-4 w-4 text-emerald-600 shrink-0 mt-0.5" />
                 <p>
-                  Landlord verified via safaricom billing. Nestlist logs all chat histories for tenant safety. Do not pay deposit before viewing.
+                  Host identity verified. Nestlist logs communications for tenant security. Never pay a deposit or booking fee prior to physical viewing.
                 </p>
               </div>
 
@@ -583,7 +447,7 @@ export const PropertyDetail: React.FC = () => {
                   </div>
                   <h4 className="font-sans font-extrabold text-stone-900 text-base">Inquiry Sent Successfully!</h4>
                   <p className="text-xs text-stone-500 max-w-sm mx-auto leading-relaxed">
-                    Jambo! Your message was submitted. We sent an instant **SMS notification** to the landlord ({landlord?.full_name}) and dispatched a delivery confirmation to your phone. The landlord will contact you soon!
+                    Jambo! Your message was submitted securely. The host has been notified and will review your inquiry. You can follow up via the in-app messages console once they connect!
                   </p>
                   <button
                     onClick={() => {
@@ -599,13 +463,13 @@ export const PropertyDetail: React.FC = () => {
                 <form onSubmit={handleSendInquiry} className="space-y-4">
                   <div className="space-y-1.5">
                     <label className="text-xs font-bold text-stone-700 uppercase tracking-wider block">
-                      Write a message to {landlord?.full_name || "the landlord"}
+                      Write a message to {landlord?.full_name || "the host"}
                     </label>
                     <textarea
                       rows={5}
                       value={inquiryMessage}
                       onChange={(e) => setInquiryMessage(e.target.value)}
-                      placeholder="e.g. Jambo, I am interested in renting this bedsitter. Is it available for viewing this Saturday at 10 AM?"
+                      placeholder="e.g. Jambo, I am interested in renting this property. Is it available for viewing this Saturday at 10 AM?"
                       className="w-full border border-stone-300 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#1E6B4A]/20 focus:border-[#1E6B4A]"
                       required
                     ></textarea>
@@ -623,20 +487,21 @@ export const PropertyDetail: React.FC = () => {
                           className="w-full border border-stone-300 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#1E6B4A]/20 focus:border-[#1E6B4A]"
                         />
                         <p className="text-[10px] text-stone-400">
-                          Enter your phone number so the landlord can contact you directly. This will be saved to your profile.
+                          Enter your phone number so verified managers can reach out once your enquiry is accepted.
                         </p>
                       </div>
                     ) : (
                       <p className="text-[10px] text-stone-400 leading-normal">
-                        Note: Your phone number ({profile?.phone}) will be included in the SMS body so the landlord can call or WhatsApp you directly.
+                        Your verified account will be linked to this message inquiry.
                       </p>
                     )}
 
                     <p className="text-[10.5px] text-stone-500 leading-normal mt-3 border-t border-stone-100 pt-3">
-                      By submitting this inquiry your name and phone number will be shared with the landlord.{" "}
+                      By submitting this inquiry you agree to our{" "}
                       <Link to="/privacy" className="text-emerald-750 hover:text-emerald-900 underline font-semibold">
-                        See our Privacy Policy
-                      </Link>.
+                        Privacy Policy
+                      </Link>{" "}
+                      and communications guidelines.
                     </p>
                   </div>
 
@@ -658,7 +523,7 @@ export const PropertyDetail: React.FC = () => {
                       ) : (
                         <>
                           <Send className="h-3.5 w-3.5" />
-                          <span>Submit & Send SMS</span>
+                          <span>Submit Inquiry</span>
                         </>
                       )}
                     </button>
@@ -669,23 +534,6 @@ export const PropertyDetail: React.FC = () => {
 
           </div>
         </div>
-      )}
-
-      {/* UNLOCK LEAD MODAL */}
-      {unlockLeadModalOpen && property && (
-        <UnlockLead
-          propertyId={property.id}
-          landlordId={property.landlord_id}
-          propertyTitle={property.title}
-          propertyType={property.type}
-          leadCredits={property.lead_credits || 0}
-          onClose={() => setUnlockLeadModalOpen(false)}
-          onSuccess={() => {
-            setUnlockLeadModalOpen(false);
-            setIsUnlocked(true);
-            window.location.reload();
-          }}
-        />
       )}
 
     </div>

@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate, Link } from "react-router-dom";
 import { AuthProvider } from "./context/AuthContext";
 import { ProtectedRoute, PublicOnlyRoute } from "./components/ProtectedRoute";
 import { Header } from "./components/Header";
+import { Footer } from "./components/Footer";
 
 // Pages
 import { Browse } from "./pages/Browse";
@@ -20,6 +21,7 @@ import { Terms } from "./pages/Terms";
 import { Pricing } from "./pages/Pricing";
 import { Profile } from "./pages/Profile";
 import { DrivePage } from "./pages/DrivePage";
+import { LandingPage } from "./pages/LandingPage";
 import AuthCallback from "./pages/AuthCallback";
 import { DevConnectionBanner } from "./components/DevConnectionBanner";
 import { CookieBanner } from "./components/CookieBanner";
@@ -66,9 +68,20 @@ export default function App() {
               {/* OAuth Callback Redirect handling */}
               <Route path="/auth/callback" element={<AuthCallback />} />
 
+              {/* Public Landing Page */}
+              <Route path="/landing" element={<LandingPage />} />
+
               {/* Protected Access Hubs */}
               <Route
                 path="/"
+                element={
+                  <ProtectedRoute>
+                    <Browse />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/browse"
                 element={
                   <ProtectedRoute>
                     <Browse />
@@ -180,26 +193,7 @@ export default function App() {
           </main>
 
           {/* Humble Branding Footer */}
-          <footer className="bg-stone-900 text-stone-400 border-t border-stone-800 text-xs py-8 text-center mt-12">
-            <div className="max-w-7xl mx-auto px-4 space-y-2">
-              <p className="font-bold text-white">Nestlist Rental Platforms Limited</p>
-              <p className="text-white/60">
-                Connecting Landlords and Tenants across Nairobi, Kiambu, Nakuru, Kisumu, and Mombasa.
-              </p>
-              <div className="flex justify-center space-x-4 text-white/60 text-[11px] font-medium pt-1">
-                <Link to="/pricing" className="text-[#34D399] hover:text-white hover:underline transition">Pricing Guide</Link>
-                <span>·</span>
-                <Link to="/privacy" className="text-[#34D399] hover:text-white hover:underline transition">Privacy Policy</Link>
-                <span>·</span>
-                <Link to="/terms" className="text-[#34D399] hover:text-white hover:underline transition">Terms of Service</Link>
-                <span>·</span>
-                <a href="mailto:support@nestlist.co.ke" className="text-[#34D399] hover:text-white transition">Support: support@nestlist.co.ke</a>
-              </div>
-              <p className="text-[10.5px] text-white/40 pt-1">
-                © 2026 Nestlist Rental Platforms Limited · Nairobi, Kenya · Secure payments via M-Pesa
-              </p>
-            </div>
-          </footer>
+          <Footer />
           <CookieBanner />
           <DevConnectionBanner />
         </div>
