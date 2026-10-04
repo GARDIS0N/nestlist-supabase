@@ -14,7 +14,8 @@ export function NotFound() {
   );
 }
 
-export default NotFound;
+
+
 
 // ── Terms.jsx ─────────────────────────────────────────────────────────────────
 export function Terms() {
