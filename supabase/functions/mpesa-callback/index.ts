@@ -13,29 +13,18 @@ serve(async (req) => {
   }
 
   try {
-    const callbackSecret = Deno.env.get("CALLBACK_SECRET");
-    if (callbackSecret) {
-      const url = new URL(req.url);
-      const token = url.searchParams.get("token");
-      if (!token || token !== callbackSecret) {
-        console.warn("⚠️ M-Pesa callback rejected: invalid secret token");
-        return new Response(JSON.stringify({ ResultCode: 0, ResultDesc: "Accepted" }), {
-          status: 200,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-    }
-
     const supabaseClient = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
     );
 
     const body = await req.json();
+    console.log("M-Pesa Callback received payload:", JSON.stringify(body));
+
     const stkCallback = body?.Body?.stkCallback;
     if (!stkCallback) {
-      return new Response(JSON.stringify({ ResultCode: 0, ResultDesc: "Accepted" }), {
-        status: 200,
+      return new Response(JSON.stringify({ error: "Invalid payload format" }), {
+        status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -44,10 +33,7 @@ serve(async (req) => {
     const resultCode = stkCallback.ResultCode;
     const resultDesc = stkCallback.ResultDesc;
 
-    // Redacted log to prevent PII leakage
-    console.log("M-Pesa Callback received:", { checkoutRequestId, resultCode });
-
-    // Search listing_payments, listing_boosts, and lead_unlocks (matching pending status strictly)
+    // Search listing_payments, listing_boosts, and lead_unlocks (in that order)
     let matchedTable: "listing_payments" | "listing_boosts" | "lead_unlocks" | null = null;
     let matchedRow: any = null;
 
@@ -55,7 +41,6 @@ serve(async (req) => {
       .from("listing_payments")
       .select("*")
       .eq("mpesa_checkout_request_id", checkoutRequestId)
-      .eq("status", "pending")
       .maybeSingle();
 
     if (lpRow) {
@@ -66,7 +51,6 @@ serve(async (req) => {
         .from("listing_boosts")
         .select("*")
         .eq("mpesa_checkout_request_id", checkoutRequestId)
-        .eq("status", "pending")
         .maybeSingle();
 
       if (lbRow) {
@@ -77,7 +61,6 @@ serve(async (req) => {
           .from("lead_unlocks")
           .select("*")
           .eq("mpesa_checkout_request_id", checkoutRequestId)
-          .eq("status", "pending")
           .maybeSingle();
 
         if (luRow) {
@@ -88,17 +71,14 @@ serve(async (req) => {
     }
 
     if (!matchedRow || !matchedTable) {
-      console.warn(`No pending payment/boost/unlock row found matching checkout ID: ${checkoutRequestId}`);
-      return new Response(JSON.stringify({ ResultCode: 0, ResultDesc: "Accepted" }), {
-        status: 200,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      console.warn(`No payment/boost/unlock row found matching checkout ID: ${checkoutRequestId}`);
+      return new Response(JSON.stringify({ message: "No match found, logged." }), { status: 200 });
     }
 
     if (resultCode === 0) {
       // Transaction successful
       let mpesaCode = "";
-      let amountPaid = 0;
+      let amountPaid = matchedRow.amount || matchedRow.amount_paid || 0;
       let payerPhone = matchedRow.payer_phone || "";
 
       const metadataItems = stkCallback.CallbackMetadata?.Item || [];
@@ -106,7 +86,7 @@ serve(async (req) => {
         if (item.Name === "MpesaReceiptNumber") {
           mpesaCode = String(item.Value);
         } else if (item.Name === "Amount") {
-          amountPaid = Number(item.Value || 0);
+          amountPaid = item.Value;
         } else if (item.Name === "PhoneNumber") {
           payerPhone = String(item.Value);
         }
@@ -116,26 +96,8 @@ serve(async (req) => {
         mpesaCode = `MPX_${Date.now()}`;
       }
 
-      const expectedAmount = Number(matchedRow.amount || matchedRow.amount_paid || 0);
-      if (expectedAmount > 0 && amountPaid < expectedAmount) {
-        console.warn(`⚠️ Underpaid callback on ${matchedTable}: expected ${expectedAmount}, got ${amountPaid}`);
-        await supabaseClient
-          .from(matchedTable)
-          .update({
-            status: "failed",
-            failure_reason: `Underpayment: expected ${expectedAmount}, got ${amountPaid}`,
-          })
-          .eq("id", matchedRow.id)
-          .eq("status", "pending");
-
-        return new Response(JSON.stringify({ ResultCode: 0, ResultDesc: "Accepted" }), {
-          status: 200,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-
       if (matchedTable === "listing_payments") {
-        const { data: updatedPayment, error: updateError } = await supabaseClient
+        const { error: updateError } = await supabaseClient
           .from("listing_payments")
           .update({
             status: "confirmed",
@@ -144,20 +106,17 @@ serve(async (req) => {
             payer_phone: payerPhone,
             confirmed_at: new Date().toISOString(),
           })
-          .eq("id", matchedRow.id)
-          .eq("status", "pending")
-          .select()
-          .maybeSingle();
+          .eq("id", matchedRow.id);
 
-        if (updateError || !updatedPayment) {
-          console.error("Failed or duplicate update on listing_payments:", updateError);
-          return new Response(JSON.stringify({ ResultCode: 0, ResultDesc: "Accepted" }), { status: 200 });
+        if (updateError) {
+          console.error("Failed to update listing_payments:", updateError);
+          return new Response(JSON.stringify({ error: "Failed to update db" }), { status: 500 });
         }
 
         if (matchedRow.property_id) {
           await supabaseClient
             .from("properties")
-            .update({ is_active: true, status: "available", payment_status: "verified" })
+            .update({ is_active: true, status: "available" })
             .eq("id", matchedRow.property_id);
         }
       } else if (matchedTable === "listing_boosts") {
@@ -182,7 +141,7 @@ serve(async (req) => {
 
         const expiresAt = new Date(startsAt.getTime() + days * 24 * 60 * 60 * 1000);
 
-        const { data: updatedBoost, error: updateError } = await supabaseClient
+        const { error: updateError } = await supabaseClient
           .from("listing_boosts")
           .update({
             status: "active",
@@ -190,14 +149,11 @@ serve(async (req) => {
             starts_at: startsAt.toISOString(),
             expires_at: expiresAt.toISOString(),
           })
-          .eq("id", matchedRow.id)
-          .eq("status", "pending")
-          .select()
-          .maybeSingle();
+          .eq("id", matchedRow.id);
 
-        if (updateError || !updatedBoost) {
-          console.error("Failed or duplicate update on listing_boosts:", updateError);
-          return new Response(JSON.stringify({ ResultCode: 0, ResultDesc: "Accepted" }), { status: 200 });
+        if (updateError) {
+          console.error("Failed to update listing_boosts:", updateError);
+          return new Response(JSON.stringify({ error: "Failed to update db" }), { status: 500 });
         }
 
         if (matchedRow.property_id) {
@@ -212,7 +168,7 @@ serve(async (req) => {
             .eq("id", matchedRow.property_id);
         }
 
-        // Send SMS notification
+        // Send SMS to landlord
         let landlordPhone = payerPhone;
         let landlordName = "Landlord";
         if (matchedRow.landlord_id) {
@@ -249,27 +205,26 @@ serve(async (req) => {
           });
         }
       } else if (matchedTable === "lead_unlocks") {
+        // Attempt atomic RPC procedure first
         const { data: rpcData, error: rpcError } = await supabaseClient.rpc(
           "confirm_lead_unlock_and_issue_credits",
           { p_unlock_id: matchedRow.id, p_mpesa_code: mpesaCode }
         );
 
         if (rpcError || !rpcData?.success) {
-          const { data: updatedUnlock, error: updateError } = await supabaseClient
+          console.warn("RPC confirm_lead_unlock_and_issue_credits failed in Edge Function, executing fallback:", rpcError);
+          const { error: updateError } = await supabaseClient
             .from("lead_unlocks")
             .update({
               status: "confirmed",
               mpesa_code: mpesaCode,
               unlocked_at: new Date().toISOString(),
             })
-            .eq("id", matchedRow.id)
-            .eq("status", "pending")
-            .select()
-            .maybeSingle();
+            .eq("id", matchedRow.id);
 
-          if (updateError || !updatedUnlock) {
-            console.error("Failed or duplicate update on lead_unlocks:", updateError);
-            return new Response(JSON.stringify({ ResultCode: 0, ResultDesc: "Accepted" }), { status: 200 });
+          if (updateError) {
+            console.error("Failed to update lead_unlocks:", updateError);
+            return new Response(JSON.stringify({ error: "Failed to update db" }), { status: 500 });
           }
 
           if (matchedRow.inquiry_id) {
@@ -284,6 +239,7 @@ serve(async (req) => {
           }
 
           const bundleSize = matchedRow.bundle_size || 1;
+          const amountPaid = matchedRow.amount_paid || matchedRow.amount || 0;
           const isBundle = bundleSize > 1 || amountPaid >= 200 || !matchedRow.inquiry_id;
           const creditsToAdd = isBundle ? (matchedRow.credits_added > 0 ? matchedRow.credits_added : (bundleSize > 1 ? bundleSize : 5)) : 0;
 
@@ -367,14 +323,18 @@ serve(async (req) => {
       // Transaction failed / cancelled
       const status: "failed" | "cancelled" = resultCode === 1032 ? "cancelled" : "failed";
 
-      await supabaseClient
+      const { error: updateError } = await supabaseClient
         .from(matchedTable)
         .update({
           status: status,
           failure_reason: resultDesc || `ResultCode ${resultCode}`,
         })
-        .eq("id", matchedRow.id)
-        .eq("status", "pending");
+        .eq("id", matchedRow.id);
+
+      if (updateError) {
+        console.error("Failed to update failed payment status:", updateError);
+        return new Response(JSON.stringify({ error: "Failed to update db" }), { status: 500 });
+      }
 
       console.log(`Payment status set to ${status} on table ${matchedTable} for ID: ${matchedRow.id}`);
     }
@@ -385,8 +345,8 @@ serve(async (req) => {
     });
   } catch (error: any) {
     console.error("Error in callback handler:", error);
-    return new Response(JSON.stringify({ ResultCode: 0, ResultDesc: "Accepted" }), {
-      status: 200,
+    return new Response(JSON.stringify({ error: error.message }), {
+      status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }

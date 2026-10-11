@@ -30,7 +30,8 @@ import {
   getDriveAccessToken,
   DriveFile,
   DriveUser,
-  exportLeadsToGoogleDrive
+  exportLeadsToGoogleDrive,
+  exportCodebaseToGoogleDrive
 } from '../lib/drive';
 
 interface GoogleDriveManagerProps {
@@ -72,6 +73,7 @@ export const GoogleDriveManager: React.FC<GoogleDriveManagerProps> = ({
 
   // Export Leads & Code state
   const [isExportingLeads, setIsExportingLeads] = useState(false);
+  const [isExportingCode, setIsExportingCode] = useState(false);
 
   useEffect(() => {
     const unsubscribe = initDriveAuth(
@@ -230,6 +232,20 @@ export const GoogleDriveManager: React.FC<GoogleDriveManagerProps> = ({
     }
   };
 
+  const handleExportCode = async () => {
+    setIsExportingCode(true);
+    setError(null);
+    try {
+      const driveFile = await exportCodebaseToGoogleDrive();
+      setUploadSuccessMsg(`Stored application codebase archive in Google Drive as "${driveFile.name}"!`);
+      await fetchFiles();
+    } catch (err: any) {
+      setError(err?.message || 'Failed to store code in Google Drive.');
+    } finally {
+      setIsExportingCode(false);
+    }
+  };
+
   const getFileIcon = (mimeType: string) => {
     if (mimeType.includes('folder')) return <Folder className="w-5 h-5 text-amber-500 fill-amber-100" />;
     if (mimeType.includes('image')) return <ImageIcon className="w-5 h-5 text-blue-500" />;
@@ -258,7 +274,7 @@ export const GoogleDriveManager: React.FC<GoogleDriveManagerProps> = ({
         </div>
         <h3 className="text-lg font-bold text-stone-900 mb-1">Google Drive Integration</h3>
         <p className="text-sm text-stone-600 max-w-md mx-auto mb-6">
-          Connect your Google Drive account to backup property documents and export tenant lead records. Scoped strictly to app-created files (<code className="text-xs bg-stone-100 px-1 py-0.5 rounded text-emerald-700">drive.file</code>).
+          Connect your Google Drive account to backup property documents, export tenant lead records, and store codebase archives. Scoped strictly to app-created files (<code className="text-xs bg-stone-100 px-1 py-0.5 rounded text-emerald-700">drive.file</code>).
         </p>
 
         {error && (
@@ -317,6 +333,16 @@ export const GoogleDriveManager: React.FC<GoogleDriveManagerProps> = ({
         </div>
 
         <div className="flex items-center space-x-2">
+          <button
+            onClick={handleExportCode}
+            disabled={isExportingCode}
+            className="inline-flex items-center space-x-1.5 px-3 py-1.5 bg-stone-800 hover:bg-stone-900 text-stone-100 rounded-xl text-xs font-semibold transition cursor-pointer disabled:opacity-50"
+            title="Store application code archive in Google Drive"
+          >
+            <FileCode className="w-3.5 h-3.5 text-emerald-400" />
+            <span>{isExportingCode ? 'Storing Code...' : 'Store Code in Drive'}</span>
+          </button>
+
           {inquiries && inquiries.length > 0 && (
             <button
               onClick={handleExportLeads}

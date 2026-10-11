@@ -19,7 +19,7 @@ interface SmsRequest {
     | "welcome_tenant"
     | "boost_activated"
     | "lead_unlocked";
-  phone?: string;
+  phone: string;
   data: Record<string, any>;
 }
 
@@ -29,38 +29,10 @@ serve(async (req) => {
   }
 
   try {
-    const authHeader = req.headers.get("Authorization");
-    const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
-    const anonKey = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
-    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
-
-    if (!authHeader) {
-      return new Response(JSON.stringify({ error: "Missing Authorization header" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    // Allow internal service key or authenticated user
-    const token = authHeader.replace(/^Bearer\s+/i, "");
-    let isServiceRole = false;
-
-    if (serviceRoleKey && token === serviceRoleKey) {
-      isServiceRole = true;
-    } else {
-      const userClient = createClient(supabaseUrl, anonKey, {
-        global: { headers: { Authorization: authHeader } },
-      });
-      const { data: { user }, error: authError } = await userClient.auth.getUser();
-      if (authError || !user) {
-        return new Response(JSON.stringify({ error: "Unauthorized: Invalid token" }), {
-          status: 401,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-    }
-
-    const serviceClient = createClient(supabaseUrl, serviceRoleKey);
+    const supabaseClient = createClient(
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
+    );
 
     const reqBody = await req.json();
     const { type, data } = reqBody as SmsRequest;
@@ -69,7 +41,7 @@ serve(async (req) => {
     // If phone is not provided directly, resolve securely on the server via recipient_id / landlord_id / tenant_id
     if (!targetPhone && (data?.recipient_id || data?.landlord_id || data?.tenant_id)) {
       const targetUserId = data.recipient_id || data.landlord_id || data.tenant_id;
-      const { data: userProf } = await serviceClient
+      const { data: userProf } = await supabaseClient
         .from("profiles")
         .select("phone")
         .eq("id", targetUserId)
@@ -138,8 +110,8 @@ serve(async (req) => {
 
     // 2. AFRICA'S TALKING API CONFIGURATION
     const username = Deno.env.get("AT_USERNAME") || "sandbox";
-    const apiKey = Deno.env.get("AT_API_KEY");
-    const isMock = !apiKey || apiKey === "MOCK_AT_API_KEY";
+    const apiKey = Deno.env.get("AT_API_KEY") || "MOCK_AT_API_KEY";
+    const isMock = apiKey === "MOCK_AT_API_KEY";
 
     let apiStatus = "sent";
     let messageId = `at_msg_${Date.now()}`;
@@ -182,7 +154,7 @@ serve(async (req) => {
     }
 
     // 3. LOG SMS TO DATABASE
-    const { error: logError } = await serviceClient.from("sms_logs").insert({
+    const { error: logError } = await supabaseClient.from("sms_logs").insert({
       type: type,
       recipient_phone: formattedPhone,
       message: messageText,

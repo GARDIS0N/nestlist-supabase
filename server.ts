@@ -18,14 +18,13 @@ import { createClient } from '@supabase/supabase-js';
 import dotenv from 'dotenv';
 import path from 'path';
 import fs from 'fs';
-import crypto from 'crypto';
 import { createServer as createViteServer } from 'vite';
 
 // Load environment variables
 dotenv.config();
 
 const app = express();
-const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
+const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3001;
 
 app.use(express.json());
 
@@ -49,35 +48,6 @@ const LISTING_FEES: Record<string, number> = {
   '5br_plus':  1500,
 };
 
-const BOOST_PRICES: Record<string, number> = {
-  '3day':  50,
-  '7day':  100,
-  '14day': 200,
-  '30day': 350,
-};
-
-const LEAD_PRICES: Record<string, number> = {
-  single_room: 25,
-  bedsitter:   50,
-  studio:      60,
-  '1br':       120,
-  '2br':       160,
-  '3br':       220,
-  '4br':       260,
-  '5br_plus':  300,
-};
-
-const LEAD_BUNDLES: Record<string, { count: number; price: number }> = {
-  single_room: { count: 5, price: 100 },
-  bedsitter:   { count: 5, price: 200 },
-  studio:      { count: 5, price: 250 },
-  '1br':       { count: 5, price: 500 },
-  '2br':       { count: 5, price: 700 },
-  '3br':       { count: 5, price: 1000 },
-  '4br':       { count: 5, price: 1200 },
-  '5br_plus':  { count: 5, price: 1500 },
-};
-
 const AT_API_KEY = process.env.AT_API_KEY || process.env.AFRICASTALKING_API_KEY || '';
 const AT_USERNAME = process.env.AT_USERNAME || 'sandbox';
 const AT_BASE = 'https://api.sandbox.africastalking.com';
@@ -92,20 +62,6 @@ const MPESA_BASE = MPESA_ENV === 'production'
   ? 'https://api.safaricom.co.ke'
   : 'https://sandbox.safaricom.co.ke';
 const CALLBACK_URL = process.env.CALLBACK_URL || 'https://nestlist.co.ke/api/mpesa/callback';
-const CALLBACK_SECRET = process.env.CALLBACK_SECRET || '';
-
-function getCallbackUrl(): string {
-  if (CALLBACK_SECRET) {
-    try {
-      const url = new URL(CALLBACK_URL);
-      url.searchParams.set('token', CALLBACK_SECRET);
-      return url.toString();
-    } catch {
-      return `${CALLBACK_URL}?token=${encodeURIComponent(CALLBACK_SECRET)}`;
-    }
-  }
-  return CALLBACK_URL;
-}
 
 function validateEnvironmentSecrets() {
   const required = {
@@ -134,6 +90,48 @@ app.use(cors({
   ],
   credentials: true
 }));
+
+// Export entire codebase API endpoint
+app.get('/api/codebase/bundle', (req, res) => {
+  try {
+    const rootDir = process.cwd();
+    const filesList: { path: string; content: string }[] = [];
+
+    const IGNORED_DIRS = new Set(['node_modules', '.git', 'dist', 'build', '.cache', '.vite', '.next']);
+    const ALLOWED_EXTENSIONS = new Set([
+      '.ts', '.tsx', '.js', '.jsx', '.json', '.css', '.html', '.md', '.sql', '.env.example', '.txt', '.config.js', '.config.ts'
+    ]);
+
+    function walkDir(currentDir: string, relativePath: string = '') {
+      const items = fs.readdirSync(currentDir);
+      for (const item of items) {
+        if (IGNORED_DIRS.has(item)) continue;
+        const fullPath = path.join(currentDir, item);
+        const rel = relativePath ? `${relativePath}/${item}` : item;
+        const stat = fs.statSync(fullPath);
+
+        if (stat.isDirectory()) {
+          walkDir(fullPath, rel);
+        } else if (stat.isFile()) {
+          const ext = path.extname(item).toLowerCase();
+          if (ALLOWED_EXTENSIONS.has(ext) || item.endsWith('.json') || item === 'Dockerfile' || item === '.gitignore') {
+            try {
+              const content = fs.readFileSync(fullPath, 'utf-8');
+              filesList.push({ path: rel, content });
+            } catch (err) {
+              console.warn(`Could not read file ${rel}:`, err);
+            }
+          }
+        }
+      }
+    }
+
+    walkDir(rootDir);
+    res.json({ success: true, count: filesList.length, files: filesList });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message || 'Failed to scan codebase' });
+  }
+});
 
 // M-Pesa Helper Functions
 function formatPhone(phone: string): string {
@@ -378,227 +376,6 @@ async function sendEmail(to: string, subject: string, html: string): Promise<voi
 }
 
 // =====================================================================
-// AUTHENTICATION & IDENTITY BINDING
-// Default-deny: every /api route (and the legacy POST /listings/:id/unlock-lead alias) requires a
-// valid Supabase access token (`Authorization: Bearer <jwt>`) unless it is
-// explicitly listed in PUBLIC_API_ROUTES below. User identity always comes from
-// the verified token - never from ids supplied in the request body/params.
-// Admin-only routes (see ADMIN_ONLY_ROUTES) additionally require profiles.role in ADMIN_ROLES.
-// =====================================================================
-type AuthedUser = { id: string; email?: string; role: string };
-
-declare global {
-  namespace Express {
-    interface Request {
-      user?: AuthedUser;
-    }
-  }
-}
-
-const IS_PRODUCTION = process.env.NODE_ENV === 'production';
-const ADMIN_ROLES = new Set(['admin', 'superadmin']);
-
-// Routes reachable without a token. Matched case-insensitively (Express routing is
-// case-insensitive) against the exact path; anything not listed here requires auth.
-const PUBLIC_API_ROUTES: Array<[string, RegExp]> = [
-  ['GET', /^\/api\/health$/i],
-  ['GET', /^\/api\/listings$/i],
-  ['GET', /^\/api\/listings\/[^/]+$/i],
-  ['GET', /^\/api\/listings\/[^/]+\/fee$/i],
-  // Safaricom webhook (authenticated separately - see callback hardening)
-  ['POST', /^\/api\/mpesa\/callback$/i],
-];
-
-// Routes that require an admin (profiles.role in ADMIN_ROLES), checked after authentication.
-// '*' matches any HTTP method. The whole /api/admin prefix is covered so new admin routes are safe by default.
-const ADMIN_ONLY_ROUTES: Array<[string, RegExp]> = [
-  ['*', /^\/api\/admin(\/|$)/i],
-  // Approving/rejecting payments - these grant listing activation, boosts and lead credits
-  ['POST', /^\/api\/boost\/[^/]+\/(confirm|reject)\/?$/i],
-  ['POST', /^\/api\/leads\/unlock\/[^/]+\/(confirm|reject)\/?$/i],
-  // SMS proxy: costs money and can be used for spam; the app itself sends SMS server-side
-  ['POST', /^\/api\/sms\/?$/i],
-];
-
-// Roles a user may pick for themselves at sign-up. Admin roles are never self-assignable.
-const SELF_ASSIGNABLE_ROLES = new Set(['tenant', 'landlord', 'caretaker', 'agent', 'user']);
-
-// Profile columns a non-admin may edit on their own profile.
-const SELF_EDITABLE_PROFILE_FIELDS = [
-  'full_name', 'phone', 'email', 'avatar_url',
-  'email_notifications', 'sms_notifications', 'agent_agency_name',
-];
-
-// Listing columns that only the server/admins may change (activation, payment, boost state, ownership).
-const PROTECTED_LISTING_FIELDS = [
-  'id', 'landlord_id', 'agent_id', 'is_active', 'is_featured', 'expires_at',
-  'view_count', 'inquiry_count', 'status', 'payment_status', 'mpesa_code', 'mpesa_phone',
-  'amount_paid', 'submitted_at', 'verified_by', 'verified_at', 'rejection_reason',
-  'is_boosted', 'boost_tier', 'boost_expires_at', 'boost_badge', 'lead_credits',
-  'expiry_sms_sent', 'created_at', 'updated_at',
-];
-
-function pickKeys(obj: any, keys: string[]): Record<string, any> {
-  const out: Record<string, any> = {};
-  if (!obj || typeof obj !== 'object') return out;
-  for (const k of keys) if (k in obj) out[k] = obj[k];
-  return out;
-}
-
-function omitKeys(obj: any, keys: string[]): Record<string, any> {
-  const out: Record<string, any> = { ...(obj && typeof obj === 'object' ? obj : {}) };
-  for (const k of keys) delete out[k];
-  return out;
-}
-
-const isAdminUser = (req: express.Request): boolean =>
-  !!req.user && ADMIN_ROLES.has(req.user.role);
-
-async function resolveUser(req: express.Request): Promise<AuthedUser | undefined> {
-  const match = /^Bearer\s+(.+)$/i.exec(req.headers.authorization || '');
-  if (!match) return undefined;
-
-  const { data, error } = await supabaseClient.auth.getUser(match[1].trim());
-  if (error || !data?.user) return undefined;
-
-  const { data: profile } = await supabaseClient
-    .from('profiles')
-    .select('role')
-    .eq('id', data.user.id)
-    .maybeSingle();
-
-  return { id: data.user.id, email: data.user.email, role: profile?.role || 'tenant' };
-}
-
-// Global gate - registered before any route, so new routes are protected by default.
-app.use(async (req, res, next) => {
-  const p = req.path.toLowerCase();
-  // Only API paths are gated. Client-side SPA routes (e.g. /listings/:id) must still serve the app shell.
-  const isApiPath = p.startsWith('/api/') || /^\/listings\/[^/]+\/unlock-lead\/?$/.test(p);
-  if (!isApiPath) return next();
-
-  const isPublic = PUBLIC_API_ROUTES.some(([m, re]) => m === req.method && re.test(req.path));
-  const isAdminOnly = ADMIN_ONLY_ROUTES.some(([m, re]) => (m === '*' || m === req.method) && re.test(req.path));
-
-  if (!useRealSupabase) {
-    // Mock/dev mode has no auth backend to verify tokens against. Never allow that in production.
-    if (IS_PRODUCTION && !isPublic) {
-      return res.status(503).json({ error: 'Authentication backend is not configured' });
-    }
-    return next();
-  }
-
-  try {
-    req.user = await resolveUser(req);
-  } catch (err: any) {
-    console.error('Auth resolution failed:', err?.message);
-    req.user = undefined;
-  }
-
-  // Public routes still get req.user when a valid token is sent (used for optional personalisation).
-  if (isPublic) return next();
-  if (!req.user) return res.status(401).json({ error: 'Authentication required' });
-  if (isAdminOnly && !isAdminUser(req)) {
-    return res.status(403).json({ error: 'Administrator access required' });
-  }
-  next();
-});
-
-/**
- * Binds user-id fields from the request to the authenticated caller.
- * - A supplied id that differs from the caller -> 403 (admins may act for others).
- * - No id supplied (body/query) -> filled in from the token.
- */
-function bindSelf(where: 'body' | 'params' | 'query', ...keys: string[]): express.RequestHandler {
-  return (req, res, next) => {
-    if (!useRealSupabase) return next();
-    const user = req.user;
-    if (!user) return res.status(401).json({ error: 'Authentication required' });
-
-    const bag = (req as any)[where] ?? ((req as any)[where] = {});
-    const admin = isAdminUser(req);
-    let supplied = false;
-
-    for (const key of keys) {
-      const v = bag[key];
-      if (v === undefined || v === null || v === '') continue;
-      supplied = true;
-      if (String(v) !== user.id && !admin) {
-        return res.status(403).json({ error: 'You can only act on your own account' });
-      }
-    }
-
-    if (!supplied && where !== 'params') bag[keys[0]] = user.id;
-    next();
-  };
-}
-
-/**
- * Allows the request only if the authenticated user owns the target resource
- * (or is an admin). `resolveOwners` returns the ids allowed to act, or null when
- * the resource doesn't exist.
- */
-function requireOwner(
-  resolveOwners: (req: express.Request) => Promise<Array<string | null | undefined> | null>,
-  opts: { allowMissing?: boolean } = {}
-): express.RequestHandler {
-  return async (req, res, next) => {
-    if (!useRealSupabase || isAdminUser(req)) return next();
-    const user = req.user;
-    if (!user) return res.status(401).json({ error: 'Authentication required' });
-
-    try {
-      const owners = await resolveOwners(req);
-      if (!owners) {
-        return opts.allowMissing ? next() : res.status(404).json({ error: 'Resource not found' });
-      }
-      if (!owners.some((o) => o != null && String(o) === user.id)) {
-        return res.status(403).json({ error: 'You do not have access to this resource' });
-      }
-      next();
-    } catch (err: any) {
-      console.error('Ownership check failed:', err?.message);
-      return res.status(500).json({ error: 'Authorization check failed' });
-    }
-  };
-}
-
-// Builds an owner resolver: loads row `id` from `table` and returns the given owner columns.
-function ownersOf(table: string, getId: (req: express.Request) => unknown, ownerCols: string[]) {
-  return async (req: express.Request): Promise<Array<string | null | undefined> | null> => {
-    const id = getId(req);
-    if (!id) return null;
-    const { data } = await supabaseClient.from(table).select('*').eq('id', String(id)).maybeSingle();
-    return data ? ownerCols.map((c) => data[c]) : null;
-  };
-}
-
-const propertyOwners = ownersOf('properties', (req) => req.params.id, ['landlord_id', 'agent_id']);
-const inquiryOwners = ownersOf('inquiries', (req) => req.params.id, ['landlord_id']);
-
-// GET /api/mpesa/status: a payment is looked up by checkout id or property id.
-async function paymentStatusOwners(req: express.Request) {
-  const { checkoutId, propertyId } = req.query;
-  if (checkoutId) {
-    const { data } = await supabaseClient
-      .from('listing_payments')
-      .select('landlord_id')
-      .eq('mpesa_checkout_request_id', String(checkoutId))
-      .maybeSingle();
-    return data ? [data.landlord_id] : null;
-  }
-  if (propertyId) {
-    const { data } = await supabaseClient
-      .from('properties')
-      .select('*')
-      .eq('id', String(propertyId))
-      .maybeSingle();
-    return data ? [data.landlord_id, data.agent_id] : null;
-  }
-  return null;
-}
-
-// =====================================================================
 // API ROUTES
 // =====================================================================
 
@@ -708,11 +485,7 @@ app.get('/api/listings', async (req, res) => {
 // GET /api/listings/:id
 app.get('/api/listings/:id', async (req, res) => {
   const { id } = req.params;
-  // Identity comes from the verified token, never from client-supplied query/headers
-  // (otherwise anyone could pass a landlord's id to view their unpaid listings).
-  const tenantId = useRealSupabase
-    ? (req.user?.id || '')
-    : ((req.query.tenantId || req.headers.tenant_id || '') as string);
+  const tenantId = (req.query.tenantId || req.headers.tenant_id || '') as string;
 
   if (useRealSupabase) {
     try {
@@ -820,7 +593,7 @@ app.get('/api/listings/:id', async (req, res) => {
 });
 
 // POST /listings/:id/unlock-lead & POST /api/listings/:id/unlock-lead
-app.post(['/listings/:id/unlock-lead', '/api/listings/:id/unlock-lead'], bindSelf('body', 'tenantId', 'tenant_id', 'userId'), async (req, res) => {
+app.post(['/listings/:id/unlock-lead', '/api/listings/:id/unlock-lead'], async (req, res) => {
   const { id } = req.params;
   const tenantId = req.body.tenantId || req.body.tenant_id || req.body.userId;
 
@@ -1052,7 +825,7 @@ app.post(['/listings/:id/unlock-lead', '/api/listings/:id/unlock-lead'], bindSel
 
 
 // POST /api/listings
-app.post('/api/listings', bindSelf('body', 'landlordId'), async (req, res) => {
+app.post('/api/listings', async (req, res) => {
   const { title, type, price, location, county, description, amenities, images, landlordId } = req.body;
 
   if (!title || !price || !landlordId) {
@@ -1111,12 +884,9 @@ app.post('/api/listings', bindSelf('body', 'landlordId'), async (req, res) => {
 });
 
 // PUT /api/listings/:id
-app.put('/api/listings/:id', requireOwner(propertyOwners), async (req, res) => {
+app.put('/api/listings/:id', async (req, res) => {
   const { id } = req.params;
-  // Owners may edit listing content only; activation/payment/boost state is server-controlled.
-  const updates = (!useRealSupabase || isAdminUser(req))
-    ? req.body
-    : omitKeys(req.body, PROTECTED_LISTING_FIELDS);
+  const updates = req.body;
 
   if (useRealSupabase) {
     try {
@@ -1154,7 +924,7 @@ app.put('/api/listings/:id', requireOwner(propertyOwners), async (req, res) => {
 });
 
 // DELETE /api/listings/:id
-app.delete('/api/listings/:id', requireOwner(propertyOwners), async (req, res) => {
+app.delete('/api/listings/:id', async (req, res) => {
   const { id } = req.params;
 
   if (useRealSupabase) {
@@ -1214,7 +984,7 @@ app.get('/api/listings/:id/fee', async (req, res) => {
 });
 
 // POST /api/listings/:id/payment
-app.post('/api/listings/:id/payment', requireOwner(propertyOwners), async (req, res) => {
+app.post('/api/listings/:id/payment', async (req, res) => {
   const { id } = req.params;
   const { mpesaCode, payerPhone, amountPaid } = req.body;
 
@@ -1359,38 +1129,29 @@ app.post('/api/listings/:id/payment', requireOwner(propertyOwners), async (req, 
 // M-PESA STK PUSH ENDPOINTS
 // =====================================================================
 
+// GET /api/mpesa/token
+// Get OAuth token (for testing)
+app.get('/api/mpesa/token', async (req, res) => {
+  try {
+    const token = await getMpesaToken();
+    res.json({ success: true, token });
+  } catch (err: any) {
+    res.status(500).json({
+      success: false,
+      error: err.message
+    });
+  }
+});
+
 // POST /api/mpesa/stk
 // Initiate STK Push
-app.post('/api/mpesa/stk', bindSelf('body', 'landlordId'), async (req, res) => {
+app.post('/api/mpesa/stk', async (req, res) => {
   const { phone, amount, propertyId, propertyTitle, landlordId } = req.body;
 
   if (!phone || !amount || !propertyId) {
     return res.status(400).json({
       success: false,
       error: 'Missing required fields: phone, amount, propertyId'
-    });
-  }
-
-  const numAmount = Number(amount);
-  if (isNaN(numAmount) || numAmount <= 0) {
-    return res.status(400).json({ success: false, error: 'Invalid payment amount' });
-  }
-
-  // Validate amount against required listing fee
-  let propType = 'bedsitter';
-  if (useRealSupabase) {
-    const { data: prop } = await supabaseClient.from('properties').select('type').eq('id', propertyId).maybeSingle();
-    if (prop?.type) propType = prop.type;
-  } else {
-    const db = getMockDb();
-    const prop = db.properties.find(p => p.id === propertyId);
-    if (prop?.type) propType = prop.type;
-  }
-  const expectedFee = LISTING_FEES[propType] || 100;
-  if (numAmount < expectedFee) {
-    return res.status(400).json({
-      success: false,
-      error: `Insufficient amount. Listing fee for ${propType} is KES ${expectedFee}`
     });
   }
 
@@ -1407,11 +1168,11 @@ app.post('/api/mpesa/stk', bindSelf('body', 'landlordId'), async (req, res) => {
         Password: pwd,
         Timestamp: ts,
         TransactionType: 'CustomerPayBillOnline',
-        Amount: Math.ceil(numAmount),
+        Amount: Math.ceil(amount),
         PartyA: tel,
         PartyB: MPESA_SHORTCODE,
         PhoneNumber: tel,
-        CallBackURL: getCallbackUrl(),
+        CallBackURL: CALLBACK_URL,
         AccountReference: 'NESTLIST-' + propertyId.slice(0, 8).toUpperCase(),
         TransactionDesc: `NestList: ${(propertyTitle || 'Listing Fee').slice(0, 20)}`,
       },
@@ -1442,7 +1203,7 @@ app.post('/api/mpesa/stk', bindSelf('body', 'landlordId'), async (req, res) => {
         .insert({
           property_id: propertyId,
           landlord_id: landlordId || null,
-          amount: Math.ceil(numAmount),
+          amount: Math.ceil(amount),
           status: 'pending',
           mpesa_checkout_request_id: d.CheckoutRequestID,
           payment_method: 'stk_push',
@@ -1469,7 +1230,7 @@ app.post('/api/mpesa/stk', bindSelf('body', 'landlordId'), async (req, res) => {
         id: paymentId,
         property_id: propertyId,
         landlord_id: landlordId || null,
-        amount: Math.ceil(numAmount),
+        amount: Math.ceil(amount),
         status: 'pending',
         mpesa_checkout_request_id: d.CheckoutRequestID,
         payment_method: 'stk_push',
@@ -1505,24 +1266,11 @@ app.post('/api/mpesa/stk', bindSelf('body', 'landlordId'), async (req, res) => {
 // Safaricom webhook — called after user pays or cancels
 app.post('/api/mpesa/callback', async (req, res) => {
   try {
-    if (CALLBACK_SECRET) {
-      const token = req.query?.token;
-      let valid = false;
-      if (typeof token === 'string' && token.length === CALLBACK_SECRET.length) {
-        valid = crypto.timingSafeEqual(Buffer.from(token), Buffer.from(CALLBACK_SECRET));
-      }
-      if (!valid) {
-        console.warn('⚠️ M-Pesa callback rejected: invalid secret token');
-        return res.status(200).json({ ResultCode: 0, ResultDesc: 'Accepted' });
-      }
-    }
-
     const cb = req.body?.Body?.stkCallback;
     const checkoutId = cb?.CheckoutRequestID;
     const resultCode = cb?.ResultCode;
 
-    // Redacted log to prevent PII exposure
-    console.log('M-Pesa callback received:', { checkoutId, resultCode });
+    console.log('M-Pesa callback received:', JSON.stringify(cb));
 
     if (!checkoutId) {
       return res.status(200).json({ ResultCode: 0, ResultDesc: 'Accepted' });
@@ -1536,89 +1284,57 @@ app.post('/api/mpesa/callback', async (req, res) => {
       const getItem = (name: string) => items.find((i: any) => i.Name === name)?.Value;
 
       const mpesaCode = getItem('MpesaReceiptNumber');
-      const amountPaid = Number(getItem('Amount') || 0);
+      const amountPaid = getItem('Amount');
       const payerPhone = getItem('PhoneNumber');
 
-      console.log(`✅ Webhook confirmed success! Code: ${mpesaCode}, Amount: ${amountPaid}`);
+      console.log(`✅ Webhook confirmed success! Code: ${mpesaCode}`);
 
       let processed = false;
 
       // 1. Process standard listing payment
       let payment: any = null;
       if (useRealSupabase) {
-        const { data: existingPay } = await supabaseClient
+        const { data: updatedPayment } = await supabaseClient
           .from('listing_payments')
-          .select('*')
+          .update({
+            status: 'confirmed',
+            mpesa_code: mpesaCode,
+            amount_paid: amountPaid,
+            payer_phone: String(payerPhone || ''),
+            verified_at: new Date().toISOString(),
+            verified_by: 'stk_auto',
+          })
           .eq('mpesa_checkout_request_id', checkoutId)
+          .select()
           .maybeSingle();
-
-        if (existingPay) {
-          if (existingPay.status !== 'pending') {
-            processed = true;
-          } else if (amountPaid < Number(existingPay.amount || 0)) {
-            console.warn(`⚠️ Underpaid listing payment: expected ${existingPay.amount}, got ${amountPaid}`);
-            await supabaseClient
-              .from('listing_payments')
-              .update({ status: 'failed', failure_reason: `Underpayment: expected ${existingPay.amount}, got ${amountPaid}` })
-              .eq('id', existingPay.id)
-              .eq('status', 'pending');
-            processed = true;
-          } else {
-            const { data: updatedPayment } = await supabaseClient
-              .from('listing_payments')
-              .update({
-                status: 'confirmed',
-                mpesa_code: mpesaCode,
-                amount_paid: amountPaid,
-                payer_phone: String(payerPhone || ''),
-                verified_at: new Date().toISOString(),
-                verified_by: 'stk_auto',
-              })
-              .eq('id', existingPay.id)
-              .eq('status', 'pending')
-              .select()
-              .maybeSingle();
-            payment = updatedPayment;
-            if (payment) processed = true;
-          }
-        }
+        payment = updatedPayment;
+        if (payment) processed = true;
       } else {
         const db = getMockDb();
         const pIndex = db.listing_payments.findIndex(pay => pay.mpesa_checkout_request_id === checkoutId);
         if (pIndex !== -1) {
-          const pay = db.listing_payments[pIndex];
-          if (pay.status !== 'pending') {
-            processed = true;
-          } else if (amountPaid < Number(pay.amount || 0)) {
-            console.warn(`⚠️ Underpaid listing payment in mock: expected ${pay.amount}, got ${amountPaid}`);
-            pay.status = 'failed';
-            pay.failure_reason = `Underpayment: expected ${pay.amount}, got ${amountPaid}`;
-            saveMockDb(db);
-            processed = true;
-          } else {
-            db.listing_payments[pIndex] = {
-              ...pay,
-              status: 'confirmed',
-              mpesa_code: mpesaCode,
-              amount_paid: amountPaid,
-              payer_phone: String(payerPhone || ''),
-              verified_at: new Date().toISOString(),
-              verified_by: 'stk_auto',
-            };
-            payment = db.listing_payments[pIndex];
-            const prop = db.properties.find(p => p.id === payment.property_id);
-            if (prop) {
-              prop.is_active = true;
-              prop.payment_status = 'verified';
-              prop.expires_at = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
-            }
-            saveMockDb(db);
-            processed = true;
+          db.listing_payments[pIndex] = {
+            ...db.listing_payments[pIndex],
+            status: 'confirmed',
+            mpesa_code: mpesaCode,
+            amount_paid: amountPaid,
+            payer_phone: String(payerPhone || ''),
+            verified_at: new Date().toISOString(),
+            verified_by: 'stk_auto',
+          };
+          payment = db.listing_payments[pIndex];
+          const prop = db.properties.find(p => p.id === payment.property_id);
+          if (prop) {
+            prop.is_active = true;
+            prop.payment_status = 'verified';
+            prop.expires_at = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
           }
+          saveMockDb(db);
+          processed = true;
         }
       }
 
-      if (processed && payment && payment.status === 'confirmed') {
+      if (processed && payment) {
         if (useRealSupabase && payment.property_id) {
           await supabaseClient
             .from('properties')
@@ -1639,7 +1355,7 @@ app.post('/api/mpesa/callback', async (req, res) => {
               .from('profiles')
               .select('phone, full_name, email')
               .eq('id', payment.landlord_id)
-              .maybeSingle();
+              .single();
             landlordProfile = profile;
           } else {
             const db = getMockDb();
@@ -1688,61 +1404,40 @@ app.post('/api/mpesa/callback', async (req, res) => {
       if (!processed) {
         let boost: any = null;
         if (useRealSupabase) {
-          const { data: existingBoost } = await supabaseClient
+          const { data: updatedBoost } = await supabaseClient
             .from('listing_boosts')
-            .select('*, property:properties(title)')
+            .update({
+              status: 'active',
+              mpesa_code: mpesaCode,
+              starts_at: new Date().toISOString()
+            })
             .eq('mpesa_checkout_request_id', checkoutId)
+            .select('*, property:properties(title)')
             .maybeSingle();
 
-          if (existingBoost) {
-            if (existingBoost.status !== 'pending') {
-              processed = true;
-            } else if (amountPaid < Number(existingBoost.amount_paid || 0)) {
-              console.warn(`⚠️ Underpaid listing boost: expected ${existingBoost.amount_paid}, got ${amountPaid}`);
-              await supabaseClient
-                .from('listing_boosts')
-                .update({ status: 'failed', failure_reason: `Underpayment: expected ${existingBoost.amount_paid}, got ${amountPaid}` })
-                .eq('id', existingBoost.id)
-                .eq('status', 'pending');
-              processed = true;
-            } else {
-              const { data: updatedBoost } = await supabaseClient
-                .from('listing_boosts')
-                .update({
-                  status: 'active',
-                  mpesa_code: mpesaCode,
-                  starts_at: new Date().toISOString()
-                })
-                .eq('id', existingBoost.id)
-                .eq('status', 'pending')
-                .select('*, property:properties(title)')
-                .maybeSingle();
+          if (updatedBoost) {
+            boost = updatedBoost;
+            processed = true;
+            const durationDays = boost.boost_tier === '3day' ? 3 : boost.boost_tier === '7day' ? 7 : boost.boost_tier === '14day' ? 14 : boost.boost_tier === '30day' ? 30 : 7;
+            const expiresAt = new Date(Date.now() + durationDays * 24 * 60 * 60 * 1000).toISOString();
+            const badgeText = boost.boost_tier === '3day' ? '⚡ Featured' : boost.boost_tier === '7day' ? '⭐ Featured' : boost.boost_tier === '14day' ? '🔥 Hot Property' : '👑 Premium';
 
-              if (updatedBoost) {
-                boost = updatedBoost;
-                processed = true;
-                const durationDays = boost.boost_tier === '3day' ? 3 : boost.boost_tier === '7day' ? 7 : boost.boost_tier === '14day' ? 14 : boost.boost_tier === '30day' ? 30 : 7;
-                const expiresAt = new Date(Date.now() + durationDays * 24 * 60 * 60 * 1000).toISOString();
-                const badgeText = boost.boost_tier === '3day' ? '⚡ Featured' : boost.boost_tier === '7day' ? '⭐ Featured' : boost.boost_tier === '14day' ? '🔥 Hot Property' : '👑 Premium';
+            await supabaseClient.from('listing_boosts').update({ expires_at: expiresAt }).eq('id', boost.id);
 
-                await supabaseClient.from('listing_boosts').update({ expires_at: expiresAt }).eq('id', boost.id);
+            await supabaseClient.from('properties').update({
+              is_boosted: true,
+              boost_tier: boost.boost_tier,
+              boost_expires_at: expiresAt,
+              boost_badge: badgeText
+            }).eq('id', boost.property_id);
 
-                await supabaseClient.from('properties').update({
-                  is_boosted: true,
-                  boost_tier: boost.boost_tier,
-                  boost_expires_at: expiresAt,
-                  boost_badge: badgeText
-                }).eq('id', boost.property_id);
-
-                const { data: profile } = await supabaseClient.from('profiles').select('phone').eq('id', boost.landlord_id).maybeSingle();
-                if (profile?.phone) {
-                  await sendSMS(
-                    profile.phone,
-                    `NestList: 🚀 Your listing '${boost.property?.title}' is now BOOSTED! It appears at the top of search results for ${durationDays} days. nestlist.co.ke`,
-                    'boost_activated'
-                  );
-                }
-              }
+            const { data: profile } = await supabaseClient.from('profiles').select('phone').eq('id', boost.landlord_id).single();
+            if (profile?.phone) {
+              await sendSMS(
+                profile.phone,
+                `NestList: 🚀 Your listing '${boost.property?.title}' is now BOOSTED! It appears at the top of search results for ${durationDays} days. nestlist.co.ke`,
+                'boost_activated'
+              );
             }
           }
         } else {
@@ -1750,44 +1445,34 @@ app.post('/api/mpesa/callback', async (req, res) => {
           const bIndex = db.listing_boosts.findIndex(b => b.mpesa_checkout_request_id === checkoutId);
           if (bIndex !== -1) {
             boost = db.listing_boosts[bIndex];
-            if (boost.status !== 'pending') {
-              processed = true;
-            } else if (amountPaid < Number(boost.amount_paid || 0)) {
-              console.warn(`⚠️ Underpaid listing boost in mock: expected ${boost.amount_paid}, got ${amountPaid}`);
-              boost.status = 'failed';
-              boost.failure_reason = `Underpayment: expected ${boost.amount_paid}, got ${amountPaid}`;
-              saveMockDb(db);
-              processed = true;
-            } else {
-              boost.status = 'active';
-              boost.mpesa_code = mpesaCode;
-              const durationDays = boost.boost_tier === '3day' ? 3 : boost.boost_tier === '7day' ? 7 : boost.boost_tier === '14day' ? 14 : boost.boost_tier === '30day' ? 30 : 7;
-              const startsAt = new Date().toISOString();
-              const expiresAt = new Date(Date.now() + durationDays * 24 * 60 * 60 * 1000).toISOString();
-              const badgeText = boost.boost_tier === '3day' ? '⚡ Featured' : boost.boost_tier === '7day' ? '⭐ Featured' : boost.boost_tier === '14day' ? '🔥 Hot Property' : '👑 Premium';
+            boost.status = 'active';
+            boost.mpesa_code = mpesaCode;
+            const durationDays = boost.boost_tier === '3day' ? 3 : boost.boost_tier === '7day' ? 7 : boost.boost_tier === '14day' ? 14 : boost.boost_tier === '30day' ? 30 : 7;
+            const startsAt = new Date().toISOString();
+            const expiresAt = new Date(Date.now() + durationDays * 24 * 60 * 60 * 1000).toISOString();
+            const badgeText = boost.boost_tier === '3day' ? '⚡ Featured' : boost.boost_tier === '7day' ? '⭐ Featured' : boost.boost_tier === '14day' ? '🔥 Hot Property' : '👑 Premium';
 
-              boost.starts_at = startsAt;
-              boost.expires_at = expiresAt;
+            boost.starts_at = startsAt;
+            boost.expires_at = expiresAt;
 
-              const prop = db.properties.find(p => p.id === boost.property_id);
-              if (prop) {
-                prop.is_boosted = true;
-                prop.boost_tier = boost.boost_tier;
-                prop.boost_expires_at = expiresAt;
-                prop.boost_badge = badgeText;
-              }
-
-              const landlord = db.profiles.find(p => p.id === boost.landlord_id);
-              if (landlord?.phone) {
-                await sendSMS(
-                  landlord.phone,
-                  `NestList: 🚀 Your listing '${prop?.title || "Property"}' is now BOOSTED! It appears at the top of search results for ${durationDays} days. nestlist.co.ke`,
-                  'boost_activated'
-                );
-              }
-              saveMockDb(db);
-              processed = true;
+            const prop = db.properties.find(p => p.id === boost.property_id);
+            if (prop) {
+              prop.is_boosted = true;
+              prop.boost_tier = boost.boost_tier;
+              prop.boost_expires_at = expiresAt;
+              prop.boost_badge = badgeText;
             }
+
+            const landlord = db.profiles.find(p => p.id === boost.landlord_id);
+            if (landlord?.phone) {
+              await sendSMS(
+                landlord.phone,
+                `NestList: 🚀 Your listing '${prop?.title || "Property"}' is now BOOSTED! It appears at the top of search results for ${durationDays} days. nestlist.co.ke`,
+                'boost_activated'
+              );
+            }
+            saveMockDb(db);
+            processed = true;
           }
         }
       }
@@ -1798,59 +1483,37 @@ app.post('/api/mpesa/callback', async (req, res) => {
         if (useRealSupabase) {
           const { data: foundUnlock } = await supabaseClient
             .from('lead_unlocks')
-            .select('*')
+            .select('id')
             .eq('mpesa_checkout_request_id', checkoutId)
             .maybeSingle();
 
           if (foundUnlock) {
-            if (foundUnlock.status !== 'pending') {
-              processed = true;
-            } else if (amountPaid < Number(foundUnlock.amount_paid || 0)) {
-              console.warn(`⚠️ Underpaid lead unlock: expected ${foundUnlock.amount_paid}, got ${amountPaid}`);
-              await supabaseClient
-                .from('lead_unlocks')
-                .update({ status: 'failed', failure_reason: `Underpayment: expected ${foundUnlock.amount_paid}, got ${amountPaid}` })
-                .eq('id', foundUnlock.id)
-                .eq('status', 'pending');
-              processed = true;
-            } else {
-              const { data: updatedUnlock } = await supabaseClient
-                .from('lead_unlocks')
-                .update({ status: 'confirmed', mpesa_code: mpesaCode, unlocked_at: new Date().toISOString() })
-                .eq('id', foundUnlock.id)
-                .eq('status', 'pending')
-                .select()
-                .maybeSingle();
+            unlock = foundUnlock;
+            processed = true;
+            await processLeadUnlockConfirmation(foundUnlock.id, mpesaCode);
 
-              if (updatedUnlock) {
-                unlock = updatedUnlock;
-                processed = true;
-                await processLeadUnlockConfirmation(unlock.id, mpesaCode);
+            // Fetch landlord profile to send notification
+            const { data: fullUnlock } = await supabaseClient
+              .from('lead_unlocks')
+              .select('*, property:properties(title, lead_credits)')
+              .eq('id', foundUnlock.id)
+              .single();
 
-                // Fetch landlord profile to send notification
-                const { data: fullUnlock } = await supabaseClient
-                  .from('lead_unlocks')
-                  .select('*, property:properties(title, lead_credits)')
-                  .eq('id', unlock.id)
-                  .single();
-
-                if (fullUnlock) {
-                  const { data: profile } = await supabaseClient.from('profiles').select('phone').eq('id', fullUnlock.landlord_id).maybeSingle();
-                  if (profile?.phone) {
-                    if (fullUnlock.credits_added > 0) {
-                      await sendSMS(
-                        profile.phone,
-                        `NestList: ✅ ${fullUnlock.credits_added} lead credits added to '${fullUnlock.property?.title || "Property"}'. nestlist.co.ke`,
-                        'bundle_purchased'
-                      );
-                    } else {
-                      await sendSMS(
-                        profile.phone,
-                        `NestList: 🔓 Lead unlocked! View tenant contact at nestlist.co.ke/dashboard`,
-                        'lead_unlocked'
-                      );
-                    }
-                  }
+            if (fullUnlock) {
+              const { data: profile } = await supabaseClient.from('profiles').select('phone').eq('id', fullUnlock.landlord_id).maybeSingle();
+              if (profile?.phone) {
+                if (fullUnlock.credits_added > 0) {
+                  await sendSMS(
+                    profile.phone,
+                    `NestList: ✅ ${fullUnlock.credits_added} lead credits added to '${fullUnlock.property?.title || "Property"}'. nestlist.co.ke`,
+                    'bundle_purchased'
+                  );
+                } else {
+                  await sendSMS(
+                    profile.phone,
+                    `NestList: 🔓 Lead unlocked! View tenant contact at nestlist.co.ke/dashboard`,
+                    'lead_unlocked'
+                  );
                 }
               }
             }
@@ -1860,55 +1523,45 @@ app.post('/api/mpesa/callback', async (req, res) => {
           const uIndex = db.lead_unlocks.findIndex(u => u.mpesa_checkout_request_id === checkoutId);
           if (uIndex !== -1) {
             unlock = db.lead_unlocks[uIndex];
-            if (unlock.status !== 'pending') {
-              processed = true;
-            } else if (amountPaid < Number(unlock.amount_paid || 0)) {
-              console.warn(`⚠️ Underpaid lead unlock in mock: expected ${unlock.amount_paid}, got ${amountPaid}`);
-              unlock.status = 'failed';
-              unlock.failure_reason = `Underpayment: expected ${unlock.amount_paid}, got ${amountPaid}`;
-              saveMockDb(db);
-              processed = true;
+            unlock.status = 'confirmed';
+            unlock.mpesa_code = mpesaCode;
+            unlock.unlocked_at = new Date().toISOString();
+
+            const prop = db.properties.find(p => p.id === unlock.property_id);
+            const landlord = db.profiles.find(p => p.id === unlock.landlord_id);
+
+            if (unlock.bundle_size === 5) {
+              const currentCredits = prop?.lead_credits || 0;
+              const newBalance = currentCredits + 5;
+              if (prop) prop.lead_credits = newBalance;
+
+              if (landlord?.phone) {
+                await sendSMS(
+                  landlord.phone,
+                  `NestList: ✅ 5 lead credits added to '${prop?.title || "Property"}'. Credits: ${newBalance}. nestlist.co.ke`,
+                  'bundle_purchased'
+                );
+              }
             } else {
-              unlock.status = 'confirmed';
-              unlock.mpesa_code = mpesaCode;
-              unlock.unlocked_at = new Date().toISOString();
-
-              const prop = db.properties.find(p => p.id === unlock.property_id);
-              const landlord = db.profiles.find(p => p.id === unlock.landlord_id);
-
-              if (unlock.bundle_size === 5) {
-                const currentCredits = prop?.lead_credits || 0;
-                const newBalance = currentCredits + 5;
-                if (prop) prop.lead_credits = newBalance;
-
-                if (landlord?.phone) {
-                  await sendSMS(
-                    landlord.phone,
-                    `NestList: ✅ 5 lead credits added to '${prop?.title || "Property"}'. Credits: ${newBalance}. nestlist.co.ke`,
-                    'bundle_purchased'
-                  );
-                }
-              } else {
-                if (unlock.inquiry_id) {
-                  const inq = db.inquiries.find(i => i.id === unlock.inquiry_id);
-                  if (inq) {
-                    inq.is_unlocked = true;
-                    inq.is_locked = false;
-                    inq.unlocked_at = new Date().toISOString();
-                  }
-                }
-
-                if (landlord?.phone) {
-                  await sendSMS(
-                    landlord.phone,
-                    `NestList: 🔓 Lead unlocked! View tenant contact at nestlist.co.ke/dashboard`,
-                    'lead_unlocked'
-                  );
+              if (unlock.inquiry_id) {
+                const inq = db.inquiries.find(i => i.id === unlock.inquiry_id);
+                if (inq) {
+                  inq.is_unlocked = true;
+                  inq.is_locked = false;
+                  inq.unlocked_at = new Date().toISOString();
                 }
               }
-              saveMockDb(db);
-              processed = true;
+
+              if (landlord?.phone) {
+                await sendSMS(
+                  landlord.phone,
+                  `NestList: 🔓 Lead unlocked! View tenant contact at nestlist.co.ke/dashboard`,
+                  'lead_unlocked'
+                );
+              }
             }
+            saveMockDb(db);
+            processed = true;
           }
         }
       }
@@ -1919,21 +1572,21 @@ app.post('/api/mpesa/callback', async (req, res) => {
       console.log(`❌ Payment failed: ${reason}`);
 
       if (useRealSupabase) {
-        await supabaseClient.from('listing_payments').update({ status: statusVal, failure_reason: reason }).eq('mpesa_checkout_request_id', checkoutId).eq('status', 'pending');
-        await supabaseClient.from('listing_boosts').update({ status: 'cancelled', failure_reason: reason }).eq('mpesa_checkout_request_id', checkoutId).eq('status', 'pending');
-        await supabaseClient.from('lead_unlocks').update({ status: 'failed', failure_reason: reason }).eq('mpesa_checkout_request_id', checkoutId).eq('status', 'pending');
+        await supabaseClient.from('listing_payments').update({ status: statusVal, failure_reason: reason }).eq('mpesa_checkout_request_id', checkoutId);
+        await supabaseClient.from('listing_boosts').update({ status: 'cancelled' }).eq('mpesa_checkout_request_id', checkoutId);
+        await supabaseClient.from('lead_unlocks').update({ status: 'failed' }).eq('mpesa_checkout_request_id', checkoutId);
       } else {
         const db = getMockDb();
-        const pIndex = db.listing_payments.findIndex(pay => pay.mpesa_checkout_request_id === checkoutId && pay.status === 'pending');
+        const pIndex = db.listing_payments.findIndex(pay => pay.mpesa_checkout_request_id === checkoutId);
         if (pIndex !== -1) {
           db.listing_payments[pIndex].status = statusVal;
           db.listing_payments[pIndex].failure_reason = reason;
         }
-        const bIndex = db.listing_boosts.findIndex(b => b.mpesa_checkout_request_id === checkoutId && b.status === 'pending');
+        const bIndex = db.listing_boosts.findIndex(b => b.mpesa_checkout_request_id === checkoutId);
         if (bIndex !== -1) {
           db.listing_boosts[bIndex].status = 'cancelled';
         }
-        const uIndex = db.lead_unlocks.findIndex(u => u.mpesa_checkout_request_id === checkoutId && u.status === 'pending');
+        const uIndex = db.lead_unlocks.findIndex(u => u.mpesa_checkout_request_id === checkoutId);
         if (uIndex !== -1) {
           db.lead_unlocks[uIndex].status = 'failed';
         }
@@ -1954,7 +1607,7 @@ app.post('/api/mpesa/callback', async (req, res) => {
 
 // GET /api/mpesa/status
 // Poll payment status
-app.get('/api/mpesa/status', requireOwner(paymentStatusOwners, { allowMissing: true }), async (req, res) => {
+app.get('/api/mpesa/status', async (req, res) => {
   const { checkoutId, propertyId } = req.query;
 
   if (!checkoutId && !propertyId) {
@@ -2562,8 +2215,19 @@ app.post('/api/admin/users/:id/restore', async (req, res) => {
 
 // ── INQUIRIES ENDPOINTS ──────────────────────────────────────────────
 
+const LEAD_PRICES: Record<string, number> = {
+  single_room: 25,
+  bedsitter:   50,
+  studio:      60,
+  '1br':       120,
+  '2br':       160,
+  '3br':       220,
+  '4br':       260,
+  '5br_plus':  300,
+};
+
 // POST /api/inquiries
-app.post('/api/inquiries', bindSelf('body', 'tenantId'), async (req, res) => {
+app.post('/api/inquiries', async (req, res) => {
   const { propertyId, landlordId, message, tenantName, tenantPhone, tenantEmail, tenantId } = req.body;
 
   if (!propertyId || !landlordId || !message || !tenantName || !tenantPhone) {
@@ -2656,7 +2320,7 @@ app.post('/api/inquiries', bindSelf('body', 'tenantId'), async (req, res) => {
 });
 
 // POST /api/inquiries/:id/unlock - Atomic lead unlock RPC wrapper for landlords
-app.post('/api/inquiries/:id/unlock', bindSelf('body', 'landlordId'), requireOwner(inquiryOwners), async (req, res) => {
+app.post('/api/inquiries/:id/unlock', async (req, res) => {
   const { id } = req.params;
   const { landlordId } = req.body;
 
@@ -2742,7 +2406,7 @@ app.post('/api/inquiries/:id/unlock', bindSelf('body', 'landlordId'), requireOwn
 });
 
 // GET /api/inquiries/landlord/:landlordId
-app.get('/api/inquiries/landlord/:landlordId', bindSelf('params', 'landlordId'), async (req, res) => {
+app.get('/api/inquiries/landlord/:landlordId', async (req, res) => {
   const { landlordId } = req.params;
 
   if (useRealSupabase) {
@@ -2798,7 +2462,7 @@ app.get('/api/inquiries/landlord/:landlordId', bindSelf('params', 'landlordId'),
 });
 
 // POST /api/inquiries/:id/reply
-app.post('/api/inquiries/:id/reply', requireOwner(inquiryOwners), async (req, res) => {
+app.post('/api/inquiries/:id/reply', async (req, res) => {
   const { id } = req.params;
   const { reply } = req.body;
 
@@ -2861,7 +2525,7 @@ app.post('/api/inquiries/:id/reply', requireOwner(inquiryOwners), async (req, re
 // ── PROFILES ENDPOINTS ───────────────────────────────────────────────
 
 // GET /api/profiles/:id
-app.get('/api/profiles/:id', bindSelf('params', 'id'), async (req, res) => {
+app.get('/api/profiles/:id', async (req, res) => {
   const { id } = req.params;
 
   if (useRealSupabase) {
@@ -2885,15 +2549,10 @@ app.get('/api/profiles/:id', bindSelf('params', 'id'), async (req, res) => {
 });
 
 // POST /api/profiles (Upsert)
-app.post('/api/profiles', bindSelf('body', 'id'), async (req, res) => {
+app.post('/api/profiles', async (req, res) => {
   const { id, full_name, phone, email, role } = req.body;
 
   if (!id) return res.status(400).json({ error: "User ID is required" });
-
-  // Never let a client self-assign a privileged role (admin/superadmin).
-  if (useRealSupabase && !isAdminUser(req) && role && !SELF_ASSIGNABLE_ROLES.has(role)) {
-    return res.status(403).json({ error: "Invalid role" });
-  }
 
   if (useRealSupabase) {
     try {
@@ -2945,12 +2604,9 @@ app.post('/api/profiles', bindSelf('body', 'id'), async (req, res) => {
 });
 
 // PUT /api/profiles/:id
-app.put('/api/profiles/:id', bindSelf('params', 'id'), async (req, res) => {
+app.put('/api/profiles/:id', async (req, res) => {
   const { id } = req.params;
-  // Non-admins may only edit contact/preferences fields (not role, credits, approval flags, ...).
-  const updates = (!useRealSupabase || isAdminUser(req))
-    ? req.body
-    : pickKeys(req.body, SELF_EDITABLE_PROFILE_FIELDS);
+  const updates = req.body;
 
   if (useRealSupabase) {
     try {
@@ -2988,7 +2644,7 @@ app.put('/api/profiles/:id', bindSelf('params', 'id'), async (req, res) => {
 // ── SAVED PROPERTIES ENDPOINTS ───────────────────────────────────────
 
 // GET /api/saved/:tenantId
-app.get('/api/saved/:tenantId', bindSelf('params', 'tenantId'), async (req, res) => {
+app.get('/api/saved/:tenantId', async (req, res) => {
   const { tenantId } = req.params;
 
   if (useRealSupabase) {
@@ -3013,7 +2669,7 @@ app.get('/api/saved/:tenantId', bindSelf('params', 'tenantId'), async (req, res)
 });
 
 // POST /api/saved
-app.post('/api/saved', bindSelf('body', 'tenantId'), async (req, res) => {
+app.post('/api/saved', async (req, res) => {
   const { tenantId, propertyId } = req.body;
 
   if (!tenantId || !propertyId) return res.status(400).json({ error: "Missing required fields" });
@@ -3052,17 +2708,11 @@ app.post('/api/saved', bindSelf('body', 'tenantId'), async (req, res) => {
 // ── MONETIZATION ENDPOINTS (BOOSTS & LEADS) ───────────────────────────
 
 // POST /api/boost/pay
-app.post('/api/boost/pay', bindSelf('body', 'landlordId'), async (req, res) => {
+app.post('/api/boost/pay', async (req, res) => {
   const { propertyId, landlordId, boostTier, amount, paymentMethod, mpesaCode, phone } = req.body;
 
   if (!propertyId || !landlordId || !boostTier || !amount || !paymentMethod) {
     return res.status(400).json({ error: "Missing required fields for boost" });
-  }
-
-  const numAmount = Number(amount);
-  const expectedBoostPrice = BOOST_PRICES[boostTier] || 50;
-  if (isNaN(numAmount) || numAmount < expectedBoostPrice) {
-    return res.status(400).json({ error: `Invalid amount. Boost tier ${boostTier} costs KES ${expectedBoostPrice}` });
   }
 
   const id = `bst-${Date.now()}`;
@@ -3082,11 +2732,11 @@ app.post('/api/boost/pay', bindSelf('body', 'landlordId'), async (req, res) => {
           Password: pwd,
           Timestamp: ts,
           TransactionType: 'CustomerPayBillOnline',
-          Amount: Math.ceil(numAmount),
+          Amount: Math.ceil(amount),
           PartyA: tel,
           PartyB: MPESA_SHORTCODE,
           PhoneNumber: tel,
-          CallBackURL: getCallbackUrl(),
+          CallBackURL: CALLBACK_URL,
           AccountReference: 'BOOST-' + propertyId.slice(0, 8).toUpperCase(),
           TransactionDesc: `NestList Boost: ${boostTier}`,
         },
@@ -3273,7 +2923,7 @@ app.post('/api/boost/:id/reject', async (req, res) => {
 });
 
 // GET /api/boost/status
-app.get('/api/boost/status', requireOwner(ownersOf('listing_boosts', (req) => req.query.boostId, ['landlord_id'])), async (req, res) => {
+app.get('/api/boost/status', async (req, res) => {
   const { boostId } = req.query;
   if (!boostId) return res.status(400).json({ error: "Missing boostId" });
 
@@ -3295,7 +2945,7 @@ app.get('/api/boost/status', requireOwner(ownersOf('listing_boosts', (req) => re
 
 // TODO: Review for removal or refactoring in a follow-up. This route appears to be dead/unused code implementing a different unlock flow than the direct Supabase / RPC / /api/inquiries/:id/unlock flows used by the frontend.
 // POST /api/leads/unlock
-app.post('/api/leads/unlock', bindSelf('body', 'landlordId'), async (req, res) => {
+app.post('/api/leads/unlock', async (req, res) => {
   const { inquiryId, propertyId, landlordId, amount, paymentMethod, mpesaCode, bundleSize, phone } = req.body;
 
   if (!propertyId || !landlordId || !paymentMethod) {
@@ -3404,25 +3054,6 @@ app.post('/api/leads/unlock', bindSelf('body', 'landlordId'), async (req, res) =
     }
   } else if (paymentMethod === 'stk_push') {
     if (!phone) return res.status(400).json({ error: "Phone number required for STK push" });
-
-    const numAmount = Number(amount);
-    let propType = 'bedsitter';
-    if (useRealSupabase) {
-      const { data: prop } = await supabaseClient.from('properties').select('type').eq('id', propertyId).maybeSingle();
-      if (prop?.type) propType = prop.type;
-    } else {
-      const db = getMockDb();
-      const prop = db.properties.find(p => p.id === propertyId);
-      if (prop?.type) propType = prop.type;
-    }
-    const expectedUnlockPrice = (isBundle || bundleSize === 5)
-      ? (LEAD_BUNDLES[propType]?.price || 200)
-      : (LEAD_PRICES[propType] || 50);
-
-    if (isNaN(numAmount) || numAmount < expectedUnlockPrice) {
-      return res.status(400).json({ error: `Invalid amount. Required: KES ${expectedUnlockPrice}` });
-    }
-
     try {
       const token = await getMpesaToken();
       const ts = mpesaTimestamp();
@@ -3436,11 +3067,11 @@ app.post('/api/leads/unlock', bindSelf('body', 'landlordId'), async (req, res) =
           Password: pwd,
           Timestamp: ts,
           TransactionType: 'CustomerPayBillOnline',
-          Amount: Math.ceil(numAmount),
+          Amount: Math.ceil(amount),
           PartyA: tel,
           PartyB: MPESA_SHORTCODE,
           PhoneNumber: tel,
-          CallBackURL: getCallbackUrl(),
+          CallBackURL: CALLBACK_URL,
           AccountReference: (isBundle ? 'BNDL-' : 'LEAD-') + propertyId.slice(0, 8).toUpperCase(),
           TransactionDesc: `NestList Lead Unlock`,
         },
@@ -3779,7 +3410,7 @@ app.post('/api/leads/unlock/:id/reject', async (req, res) => {
 });
 
 // GET /api/leads/unlock/status
-app.get('/api/leads/unlock/status', requireOwner(ownersOf('lead_unlocks', (req) => req.query.unlockId, ['landlord_id'])), async (req, res) => {
+app.get('/api/leads/unlock/status', async (req, res) => {
   const { unlockId } = req.query;
   if (!unlockId) return res.status(400).json({ error: "Missing unlockId" });
 
@@ -3862,7 +3493,7 @@ app.get('/api/admin/lead-unlocks', async (req, res) => {
 });
 
 // DELETE /api/saved/:tenantId/:propertyId
-app.delete('/api/saved/:tenantId/:propertyId', bindSelf('params', 'tenantId'), async (req, res) => {
+app.delete('/api/saved/:tenantId/:propertyId', async (req, res) => {
   const { tenantId, propertyId } = req.params;
 
   if (useRealSupabase) {

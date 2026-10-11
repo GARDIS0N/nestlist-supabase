@@ -13,50 +13,25 @@ serve(async (req) => {
   }
 
   try {
-    const authHeader = req.headers.get("Authorization");
-    const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
-    const anonKey = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
-    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
-
-    if (!authHeader) {
-      return new Response(JSON.stringify({ error: "Missing Authorization header" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    // Authenticate user via JWT
-    const userClient = createClient(supabaseUrl, anonKey, {
-      global: { headers: { Authorization: authHeader } },
-    });
-    const { data: { user }, error: authError } = await userClient.auth.getUser();
-
-    if (authError || !user) {
-      return new Response(JSON.stringify({ error: "Unauthorized: Invalid token" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    const serviceClient = createClient(supabaseUrl, serviceRoleKey);
+    const supabaseClient = createClient(
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
+    );
 
     const body = await req.json();
-    const { propertyId, inquiryId } = body;
+    const { propertyId, landlordId, inquiryId } = body;
 
-    if (!propertyId) {
+    if (!propertyId || !landlordId) {
       return new Response(
-        JSON.stringify({ error: "Missing required field: propertyId" }),
+        JSON.stringify({ error: "Missing required fields: propertyId and landlordId" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    // Force landlordId to authenticated caller user id
-    const landlordId = user.id;
-
-    // 1. Check properties.lead_credits >= 1 and verify landlord ownership
-    const { data: property, error: propError } = await serviceClient
+    // 1. Check properties.lead_credits >= 1
+    const { data: property, error: propError } = await supabaseClient
       .from("properties")
-      .select("id, landlord_id, lead_credits, title")
+      .select("lead_credits, title")
       .eq("id", propertyId)
       .maybeSingle();
 
@@ -64,13 +39,6 @@ serve(async (req) => {
       return new Response(
         JSON.stringify({ error: "Property not found" }),
         { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    if (property.landlord_id && property.landlord_id !== landlordId) {
-      return new Response(
-        JSON.stringify({ error: "Forbidden: You are not the owner of this property" }),
-        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
@@ -83,7 +51,7 @@ serve(async (req) => {
     }
 
     // 2. Decrement lead_credits by 1
-    const { error: decError } = await serviceClient
+    const { error: decError } = await supabaseClient
       .from("properties")
       .update({ lead_credits: currentCredits - 1 })
       .eq("id", propertyId);
@@ -95,7 +63,7 @@ serve(async (req) => {
     // 3. Set inquiries.is_locked = false if inquiryId provided
     let updatedInquiry = null;
     if (inquiryId) {
-      const { data: inq, error: inqError } = await serviceClient
+      const { data: inq, error: inqError } = await supabaseClient
         .from("inquiries")
         .update({
           is_locked: false,
@@ -114,7 +82,7 @@ serve(async (req) => {
     }
 
     // 4. Insert lead_unlocks row
-    const { error: unlockErr } = await serviceClient
+    const { error: unlockErr } = await supabaseClient
       .from("lead_unlocks")
       .insert({
         property_id: propertyId,
@@ -134,16 +102,18 @@ serve(async (req) => {
     // 5. Send SMS notification to landlord
     let landlordPhone = "";
     let landlordName = "Landlord";
-    const { data: prof } = await serviceClient
-      .from("profiles")
-      .select("phone, full_name")
-      .eq("id", landlordId)
-      .maybeSingle();
-    if (prof?.phone) landlordPhone = prof.phone;
-    if (prof?.full_name) landlordName = prof.full_name;
+    if (landlordId) {
+      const { data: prof } = await supabaseClient
+        .from("profiles")
+        .select("phone, full_name")
+        .eq("id", landlordId)
+        .maybeSingle();
+      if (prof?.phone) landlordPhone = prof.phone;
+      if (prof?.full_name) landlordName = prof.full_name;
+    }
 
     if (landlordPhone) {
-      await serviceClient.functions.invoke("send-sms", {
+      await supabaseClient.functions.invoke("send-sms", {
         body: {
           type: "lead_unlocked",
           phone: landlordPhone,

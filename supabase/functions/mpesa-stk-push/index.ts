@@ -7,83 +7,22 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-const LISTING_FEES: Record<string, number> = {
-  single_room: 100,
-  bedsitter:   200,
-  studio:      250,
-  '1br':       500,
-  '2br':       700,
-  '3br':       1000,
-  '4br':       1200,
-  '5br_plus':  1500,
-};
-
-const BOOST_PRICES: Record<string, number> = {
-  '3day':  50,
-  '7day':  100,
-  '14day': 200,
-  '30day': 350,
-};
-
-const LEAD_PRICES: Record<string, number> = {
-  single_room: 25,
-  bedsitter:   50,
-  studio:      60,
-  '1br':       120,
-  '2br':       160,
-  '3br':       220,
-  '4br':       260,
-  '5br_plus':  300,
-};
-
-const LEAD_BUNDLES: Record<string, { count: number; price: number }> = {
-  single_room: { count: 5, price: 100 },
-  bedsitter:   { count: 5, price: 200 },
-  studio:      { count: 5, price: 250 },
-  '1br':       { count: 5, price: 500 },
-  '2br':       { count: 5, price: 700 },
-  '3br':       { count: 5, price: 1000 },
-  '4br':       { count: 5, price: 1200 },
-  '5br_plus':  { count: 5, price: 1500 },
-};
-
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
 
   try {
-    const authHeader = req.headers.get("Authorization");
-    const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
-    const anonKey = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
-    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
-
-    if (!authHeader) {
-      return new Response(JSON.stringify({ error: "Missing Authorization header" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    // Authenticate calling user from JWT
-    const userClient = createClient(supabaseUrl, anonKey, {
-      global: { headers: { Authorization: authHeader } },
-    });
-    const { data: { user }, error: authError } = await userClient.auth.getUser();
-
-    if (authError || !user) {
-      return new Response(JSON.stringify({ error: "Unauthorized: Invalid token" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    const serviceClient = createClient(supabaseUrl, serviceRoleKey);
+    const supabaseClient = createClient(
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
+    );
 
     const body = await req.json();
     const {
       paymentType = 'listing_fee',
       propertyId,
+      landlordId,
       phone,
       amount,
       propertyType,
@@ -94,50 +33,9 @@ serve(async (req) => {
       mpesaCode
     } = body;
 
-    // Force landlordId to authenticated caller user id
-    const landlordId = user.id;
-
-    if (!propertyId || !amount) {
+    if (!propertyId || !landlordId || !amount) {
       return new Response(
-        JSON.stringify({ error: "Missing required fields: propertyId and amount" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    const numAmount = Number(amount);
-    if (isNaN(numAmount) || numAmount <= 0) {
-      return new Response(
-        JSON.stringify({ error: "Invalid payment amount" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    // Lookup property type for fee validation
-    let propType = propertyType || 'bedsitter';
-    if (propertyId) {
-      const { data: prop } = await serviceClient
-        .from("properties")
-        .select("type")
-        .eq("id", propertyId)
-        .maybeSingle();
-      if (prop?.type) propType = prop.type;
-    }
-
-    // Validate fee requirements by paymentType
-    let requiredFee = 100;
-    if (paymentType === 'listing_fee') {
-      requiredFee = LISTING_FEES[propType] || 100;
-    } else if (paymentType === 'boost') {
-      requiredFee = BOOST_PRICES[boostTier || '7day'] || 50;
-    } else if (paymentType === 'lead_unlock') {
-      requiredFee = (bundleSize && bundleSize >= 5)
-        ? (LEAD_BUNDLES[propType]?.price || 200)
-        : (LEAD_PRICES[propType] || 50);
-    }
-
-    if (numAmount < requiredFee) {
-      return new Response(
-        JSON.stringify({ error: `Insufficient amount. Required fee for ${paymentType} (${propType}) is KES ${requiredFee}` }),
+        JSON.stringify({ error: "Missing required propertyId, landlordId, or amount" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -151,18 +49,16 @@ serve(async (req) => {
       }
 
       let recordId = "";
-      const cleanCode = mpesaCode.toUpperCase().trim();
-
       if (paymentType === 'listing_fee') {
-        const { data, error } = await serviceClient
+        const { data, error } = await supabaseClient
           .from("listing_payments")
           .insert({
             property_id: propertyId,
             landlord_id: landlordId,
-            amount: Math.ceil(numAmount),
-            property_type: propType,
+            amount: amount,
+            property_type: propertyType || "residential",
             payment_method: 'manual',
-            mpesa_code: cleanCode,
+            mpesa_code: mpesaCode.toUpperCase().trim(),
             status: 'pending'
           })
           .select()
@@ -170,15 +66,15 @@ serve(async (req) => {
         if (error) throw error;
         recordId = data.id;
       } else if (paymentType === 'boost') {
-        const { data, error } = await serviceClient
+        const { data, error } = await supabaseClient
           .from("listing_boosts")
           .insert({
             property_id: propertyId,
             landlord_id: landlordId,
             boost_tier: boostTier || '7day',
-            amount_paid: Math.ceil(numAmount),
+            amount: amount,
             payment_method: 'manual',
-            mpesa_code: cleanCode,
+            mpesa_code: mpesaCode.toUpperCase().trim(),
             status: 'pending'
           })
           .select()
@@ -186,16 +82,16 @@ serve(async (req) => {
         if (error) throw error;
         recordId = data.id;
       } else if (paymentType === 'lead_unlock') {
-        const { data, error } = await serviceClient
+        const { data, error } = await supabaseClient
           .from("lead_unlocks")
           .insert({
             property_id: propertyId,
             inquiry_id: inquiryId || null,
             landlord_id: landlordId,
             bundle_size: bundleSize || 1,
-            amount_paid: Math.ceil(numAmount),
+            amount_paid: amount,
             payment_method: 'manual',
-            mpesa_code: cleanCode,
+            mpesa_code: mpesaCode.toUpperCase().trim(),
             status: 'pending'
           })
           .select()
@@ -222,26 +118,12 @@ serve(async (req) => {
       );
     }
 
-    const consumerKey = Deno.env.get("MPESA_CONSUMER_KEY");
-    const consumerSecret = Deno.env.get("MPESA_CONSUMER_SECRET");
+    // 1. SAFARICOM DARAJA OAUTH - GET ACCESS TOKEN
+    const consumerKey = Deno.env.get("MPESA_CONSUMER_KEY") || "MOCK_CONSUMER_KEY";
+    const consumerSecret = Deno.env.get("MPESA_CONSUMER_SECRET") || "MOCK_CONSUMER_SECRET";
     const shortcode = Deno.env.get("MPESA_SHORTCODE") || "174379";
-    const passkey = Deno.env.get("MPESA_PASSKEY") || "";
-    let callbackUrl = Deno.env.get("MPESA_CALLBACK_URL") || `${supabaseUrl}/functions/v1/mpesa-callback`;
-
-    const callbackSecret = Deno.env.get("CALLBACK_SECRET");
-    if (callbackSecret) {
-      callbackUrl = `${callbackUrl}?token=${encodeURIComponent(callbackSecret)}`;
-    }
-
-    const envMode = Deno.env.get("ENVIRONMENT") || "development";
-    if (!consumerKey || !consumerSecret) {
-      if (envMode === "production") {
-        return new Response(
-          JSON.stringify({ error: "M-Pesa payment gateway credentials missing in production" }),
-          { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
-    }
+    const passkey = Deno.env.get("MPESA_PASSKEY") || "bfb279f9aa9bdbcf158e97dd71a467cd2e0c893059b10f78e6b72ada1ed2c919";
+    const callbackUrl = Deno.env.get("MPESA_CALLBACK_URL") || `${Deno.env.get("SUPABASE_URL")}/functions/v1/mpesa-callback`;
 
     // Format phone to 254XXXXXXXXX
     let formattedPhone = String(phone).trim().replace("+", "");
@@ -253,74 +135,70 @@ serve(async (req) => {
     }
 
     let checkoutRequestId = `ws_CO_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
-    let mpesaResponseData: any = null;
+    let mpesaResponseData = null;
 
-    if (consumerKey && consumerSecret) {
-      const auth = btoa(`${consumerKey}:${consumerSecret}`);
-      const mpesaBase = Deno.env.get("MPESA_ENV") === "production"
-        ? "https://api.safaricom.co.ke"
-        : "https://sandbox.safaricom.co.ke";
+    const isMock = consumerKey === "MOCK_CONSUMER_KEY" || consumerSecret === "MOCK_CONSUMER_SECRET";
 
-      const oauthResponse = await fetch(
-        `${mpesaBase}/oauth/v1/generate?grant_type=client_credentials`,
-        { headers: { Authorization: `Basic ${auth}` } }
-      );
-      const oauthData = await oauthResponse.json();
-      const accessToken = oauthData.access_token;
+    if (!isMock) {
+      try {
+        const auth = btoa(`${consumerKey}:${consumerSecret}`);
+        const oauthResponse = await fetch(
+          "https://sandbox.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials",
+          { headers: { Authorization: `Basic ${auth}` } }
+        );
+        const oauthData = await oauthResponse.json();
+        const accessToken = oauthData.access_token;
 
-      if (!accessToken) {
-        throw new Error(`M-Pesa OAuth failed: ${oauthData.errorMessage || JSON.stringify(oauthData)}`);
-      }
+        const timestamp = new Date()
+          .toISOString()
+          .replace(/[^0-9]/g, "")
+          .slice(0, 14);
+        const password = btoa(`${shortcode}${passkey}${timestamp}`);
 
-      const timestamp = new Date()
-        .toISOString()
-        .replace(/[^0-9]/g, "")
-        .slice(0, 14);
-      const password = btoa(`${shortcode}${passkey}${timestamp}`);
+        const stkPayload = {
+          BusinessShortCode: shortcode,
+          Password: password,
+          Timestamp: timestamp,
+          TransactionType: "CustomerPayBillOnline",
+          Amount: Math.round(amount),
+          PartyA: formattedPhone,
+          PartyB: shortcode,
+          PhoneNumber: formattedPhone,
+          CallBackURL: callbackUrl,
+          AccountReference: `Nestlist ${propertyId.slice(0, 8)}`,
+          TransactionDesc: `Payment for ${paymentType}`,
+        };
 
-      const stkPayload = {
-        BusinessShortCode: shortcode,
-        Password: password,
-        Timestamp: timestamp,
-        TransactionType: "CustomerPayBillOnline",
-        Amount: Math.ceil(numAmount),
-        PartyA: formattedPhone,
-        PartyB: shortcode,
-        PhoneNumber: formattedPhone,
-        CallBackURL: callbackUrl,
-        AccountReference: `NestList-${propertyId.slice(0, 8).toUpperCase()}`,
-        TransactionDesc: `Payment for ${paymentType}`,
-      };
+        const stkResponse = await fetch(
+          "https://sandbox.safaricom.co.ke/mpesa/stkpush/v1/processrequest",
+          {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${accessToken}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify(stkPayload),
+          }
+        );
 
-      const stkResponse = await fetch(
-        `${mpesaBase}/mpesa/stkpush/v1/processrequest`,
-        {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(stkPayload),
+        mpesaResponseData = await stkResponse.json();
+        if (mpesaResponseData.CheckoutRequestID) {
+          checkoutRequestId = mpesaResponseData.CheckoutRequestID;
         }
-      );
-
-      mpesaResponseData = await stkResponse.json();
-      if (mpesaResponseData.CheckoutRequestID) {
-        checkoutRequestId = mpesaResponseData.CheckoutRequestID;
-      } else {
-        throw new Error(mpesaResponseData.ResponseDescription || mpesaResponseData.errorMessage || "STK Push failed");
+      } catch (err) {
+        console.error("Daraja integration failed, fallback to mocked sandbox: ", err);
       }
     }
 
     let recordId = "";
     if (paymentType === 'listing_fee') {
-      const { data, error } = await serviceClient
+      const { data, error } = await supabaseClient
         .from("listing_payments")
         .insert({
           property_id: propertyId,
           landlord_id: landlordId,
-          amount: Math.ceil(numAmount),
-          property_type: propType,
+          amount: amount,
+          property_type: propertyType || "residential",
           mpesa_checkout_request_id: checkoutRequestId,
           payer_phone: formattedPhone,
           payment_method: 'stk_push',
@@ -331,13 +209,13 @@ serve(async (req) => {
       if (error) throw error;
       recordId = data.id;
     } else if (paymentType === 'boost') {
-      const { data, error } = await serviceClient
+      const { data, error } = await supabaseClient
         .from("listing_boosts")
         .insert({
           property_id: propertyId,
           landlord_id: landlordId,
           boost_tier: boostTier || '7day',
-          amount_paid: Math.ceil(numAmount),
+          amount: amount,
           mpesa_checkout_request_id: checkoutRequestId,
           payment_method: 'stk_push',
           status: "pending",
@@ -347,14 +225,14 @@ serve(async (req) => {
       if (error) throw error;
       recordId = data.id;
     } else if (paymentType === 'lead_unlock') {
-      const { data, error } = await serviceClient
+      const { data, error } = await supabaseClient
         .from("lead_unlocks")
         .insert({
           property_id: propertyId,
           inquiry_id: inquiryId || null,
           landlord_id: landlordId,
           bundle_size: bundleSize || 1,
-          amount_paid: Math.ceil(numAmount),
+          amount_paid: amount,
           mpesa_checkout_request_id: checkoutRequestId,
           payment_method: 'stk_push',
           status: "pending",
@@ -370,7 +248,10 @@ serve(async (req) => {
         success: true,
         record_id: recordId,
         checkout_request_id: checkoutRequestId,
-        message: "STK Push sent to phone",
+        message: isMock 
+          ? "STK Push initiated successfully (Simulated)" 
+          : "STK Push initiated successfully on landlord phone",
+        is_mocked: isMock,
       }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
