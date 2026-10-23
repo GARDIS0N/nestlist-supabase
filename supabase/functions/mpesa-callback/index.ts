@@ -12,6 +12,17 @@ serve(async (req) => {
     return new Response("ok", { headers: corsHeaders });
   }
 
+  // Safaricom cannot sign callbacks, so we require a shared secret in the URL (?token=...).
+  const expected = Deno.env.get("MPESA_CALLBACK_SECRET") ?? "";
+  const given = new URL(req.url).searchParams.get("token") ?? "";
+  if (!expected || given.length !== expected.length ||
+      !given.split("").every((c, i) => c === expected[i])) {
+    console.warn("M-Pesa callback rejected: missing or invalid secret token");
+    return new Response(JSON.stringify({ ResultCode: 0, ResultDesc: "Accepted" }), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
   try {
     const supabaseClient = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",

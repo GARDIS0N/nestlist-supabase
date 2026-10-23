@@ -14,13 +14,9 @@ export function sanitizeUrl(url: string): string {
   return url;
 }
 
-const SUPABASE_URL = sanitizeUrl(
-  import.meta.env.VITE_SUPABASE_URL
-  || 'https://wkbkcjbtvzfbjkbovpac.supabase.co'
-);
+const SUPABASE_URL = sanitizeUrl(import.meta.env.VITE_SUPABASE_URL || '');
 
-const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY
-  || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndrYmtjamJ0dnpmYmprYm92cGFjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI3NzIyMjQsImV4cCI6MjA5ODM0ODIyNH0.pxuck5s1lLwy0lVWpBOKZGvWGbFHtDZ1SUs96WuZWt0';
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
 
 export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   auth: {

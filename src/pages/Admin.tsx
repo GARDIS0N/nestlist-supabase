@@ -1267,7 +1267,7 @@ export const AdminPanel: React.FC = () => {
                   Nestlist Admin Hub
                 </h1>
                 <p className="text-white/60 text-xs mt-1.5 font-medium">Verified Administrator Terminal</p>
-                <p className="text-white/60 text-xs font-mono">Managed by {profile?.email || "gardisonkirui11@gmail.com"}</p>
+                <p className="text-white/60 text-xs font-mono">Managed by {profile?.email || ""}</p>
               </div>
             </div>
             

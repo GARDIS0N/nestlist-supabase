@@ -17,7 +17,7 @@ NestList supports two main M-Pesa payment flows to activate property listings:
    - Meanwhile, the React client polls `/api/mpesa/status` every 3 seconds to update the UI on success.
 
 2. **Manual Paybill Verification (Backup)**:
-   - The user pays manually using Paybill **247247**, Account **0715185037**.
+   - The user pays manually using Paybill **<your-paybill>**, Account **<your-account-number>**.
    - The user enters their 10-character confirmation code (e.g., QBG582Y78X).
    - Admins verify and activate the listing via the administrative oversight panel.
 
@@ -75,7 +75,7 @@ SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_secret
 
 1. Log into NestList as a landlord and proceed to **List Property**.
 2. Complete Steps 1-4. In **Step 5 (Payment Verification)**, choose **M-Pesa STK Push (Instant)**.
-3. Enter your phone number in the standard format (e.g., `0715185037` or `254715185037`).
+3. Enter your phone number in the standard format (e.g., `07XXXXXXXX` or `2547XXXXXXXX`).
 4. Click **Initiate Payment**.
 5. Check your phone: Safaricom should immediately send a secure PIN input dialog.
 6. Enter any PIN (sandbox will accept any PIN, but if you want to simulate success/failure, check the Safaricom Daraja test numbers table).

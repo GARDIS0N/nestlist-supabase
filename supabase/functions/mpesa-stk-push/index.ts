@@ -122,8 +122,9 @@ serve(async (req) => {
     const consumerKey = Deno.env.get("MPESA_CONSUMER_KEY") || "MOCK_CONSUMER_KEY";
     const consumerSecret = Deno.env.get("MPESA_CONSUMER_SECRET") || "MOCK_CONSUMER_SECRET";
     const shortcode = Deno.env.get("MPESA_SHORTCODE") || "174379";
-    const passkey = Deno.env.get("MPESA_PASSKEY") || "bfb279f9aa9bdbcf158e97dd71a467cd2e0c893059b10f78e6b72ada1ed2c919";
-    const callbackUrl = Deno.env.get("MPESA_CALLBACK_URL") || `${Deno.env.get("SUPABASE_URL")}/functions/v1/mpesa-callback`;
+    const passkey = Deno.env.get("MPESA_PASSKEY") || "";
+    const callbackBase = Deno.env.get("MPESA_CALLBACK_URL") || `${Deno.env.get("SUPABASE_URL")}/functions/v1/mpesa-callback`;
+    const callbackUrl = `${callbackBase}${callbackBase.includes("?") ? "&" : "?"}token=${encodeURIComponent(Deno.env.get("MPESA_CALLBACK_SECRET") ?? "")}`;
 
     // Format phone to 254XXXXXXXXX
     let formattedPhone = String(phone).trim().replace("+", "");

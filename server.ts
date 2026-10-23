@@ -17,6 +17,7 @@ import nodemailer from 'nodemailer';
 import { createClient } from '@supabase/supabase-js';
 import dotenv from 'dotenv';
 import path from 'path';
+import crypto from 'crypto';
 import fs from 'fs';
 import { createServer as createViteServer } from 'vite';
 
@@ -31,10 +32,10 @@ app.use(express.json());
 // =====================================================================
 // CONSTANTS (exactly as specified)
 // =====================================================================
-const ADMIN_PHONE = '+254715185037';
+const ADMIN_PHONE = process.env.ADMIN_PHONE || '';
 const ADMIN_EMAIL = 'info@nestlist.co.ke';
-const MPESA_PAYBILL = '247247';
-const MPESA_ACCOUNT = '0715185037';
+const MPESA_PAYBILL = process.env.MPESA_PAYBILL || '';
+const MPESA_ACCOUNT = process.env.MPESA_MANUAL_ACCOUNT || '';
 const APP_URL = 'https://nestlist.co.ke';
 
 const LISTING_FEES: Record<string, number> = {
@@ -62,6 +63,14 @@ const MPESA_BASE = MPESA_ENV === 'production'
   ? 'https://api.safaricom.co.ke'
   : 'https://sandbox.safaricom.co.ke';
 const CALLBACK_URL = process.env.CALLBACK_URL || 'https://nestlist.co.ke/api/mpesa/callback';
+const CALLBACK_SECRET = process.env.CALLBACK_SECRET || '';
+
+function getCallbackUrl(): string {
+  if (!CALLBACK_SECRET) return CALLBACK_URL;
+  const url = new URL(CALLBACK_URL);
+  url.searchParams.set('token', CALLBACK_SECRET);
+  return url.toString();
+}
 
 function validateEnvironmentSecrets() {
   const required = {
@@ -90,48 +99,6 @@ app.use(cors({
   ],
   credentials: true
 }));
-
-// Export entire codebase API endpoint
-app.get('/api/codebase/bundle', (req, res) => {
-  try {
-    const rootDir = process.cwd();
-    const filesList: { path: string; content: string }[] = [];
-
-    const IGNORED_DIRS = new Set(['node_modules', '.git', 'dist', 'build', '.cache', '.vite', '.next']);
-    const ALLOWED_EXTENSIONS = new Set([
-      '.ts', '.tsx', '.js', '.jsx', '.json', '.css', '.html', '.md', '.sql', '.env.example', '.txt', '.config.js', '.config.ts'
-    ]);
-
-    function walkDir(currentDir: string, relativePath: string = '') {
-      const items = fs.readdirSync(currentDir);
-      for (const item of items) {
-        if (IGNORED_DIRS.has(item)) continue;
-        const fullPath = path.join(currentDir, item);
-        const rel = relativePath ? `${relativePath}/${item}` : item;
-        const stat = fs.statSync(fullPath);
-
-        if (stat.isDirectory()) {
-          walkDir(fullPath, rel);
-        } else if (stat.isFile()) {
-          const ext = path.extname(item).toLowerCase();
-          if (ALLOWED_EXTENSIONS.has(ext) || item.endsWith('.json') || item === 'Dockerfile' || item === '.gitignore') {
-            try {
-              const content = fs.readFileSync(fullPath, 'utf-8');
-              filesList.push({ path: rel, content });
-            } catch (err) {
-              console.warn(`Could not read file ${rel}:`, err);
-            }
-          }
-        }
-      }
-    }
-
-    walkDir(rootDir);
-    res.json({ success: true, count: filesList.length, files: filesList });
-  } catch (error: any) {
-    res.status(500).json({ error: error.message || 'Failed to scan codebase' });
-  }
-});
 
 // M-Pesa Helper Functions
 function formatPhone(phone: string): string {
@@ -351,14 +318,18 @@ async function sendSMS(phone: string, message: string, type: string): Promise<vo
 }
 
 async function sendEmail(to: string, subject: string, html: string): Promise<void> {
+  if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
+    console.warn('Email not sent: SMTP_USER / SMTP_PASS are not configured');
+    return;
+  }
   try {
     const transporter = nodemailer.createTransport({
       host: 'smtp.gmail.com',
       port: 587,
       secure: false,
       auth: {
-        user: 'gardisonkirui11@gmail.com',
-        pass: '***REMOVED-ROTATED-CREDENTIAL***',
+        user: process.env.SMTP_USER || '',
+        pass: process.env.SMTP_PASS || '',
       },
     });
 
@@ -1172,7 +1143,7 @@ app.post('/api/mpesa/stk', async (req, res) => {
         PartyA: tel,
         PartyB: MPESA_SHORTCODE,
         PhoneNumber: tel,
-        CallBackURL: CALLBACK_URL,
+        CallBackURL: getCallbackUrl(),
         AccountReference: 'NESTLIST-' + propertyId.slice(0, 8).toUpperCase(),
         TransactionDesc: `NestList: ${(propertyTitle || 'Listing Fee').slice(0, 20)}`,
       },
@@ -1266,6 +1237,21 @@ app.post('/api/mpesa/stk', async (req, res) => {
 // Safaricom webhook — called after user pays or cancels
 app.post('/api/mpesa/callback', async (req, res) => {
   try {
+    // Reject callbacks that do not carry the shared secret. Fail closed in production.
+    if (CALLBACK_SECRET) {
+      const token = req.query?.token;
+      const ok = typeof token === 'string'
+        && token.length === CALLBACK_SECRET.length
+        && crypto.timingSafeEqual(Buffer.from(token), Buffer.from(CALLBACK_SECRET));
+      if (!ok) {
+        console.warn('M-Pesa callback rejected: invalid secret token');
+        return res.status(200).json({ ResultCode: 0, ResultDesc: 'Accepted' });
+      }
+    } else if (MPESA_ENV === 'production') {
+      console.error('CALLBACK_SECRET is not set; refusing M-Pesa callback in production');
+      return res.status(200).json({ ResultCode: 0, ResultDesc: 'Accepted' });
+    }
+
     const cb = req.body?.Body?.stkCallback;
     const checkoutId = cb?.CheckoutRequestID;
     const resultCode = cb?.ResultCode;
@@ -2736,7 +2722,7 @@ app.post('/api/boost/pay', async (req, res) => {
           PartyA: tel,
           PartyB: MPESA_SHORTCODE,
           PhoneNumber: tel,
-          CallBackURL: CALLBACK_URL,
+          CallBackURL: getCallbackUrl(),
           AccountReference: 'BOOST-' + propertyId.slice(0, 8).toUpperCase(),
           TransactionDesc: `NestList Boost: ${boostTier}`,
         },
@@ -3071,7 +3057,7 @@ app.post('/api/leads/unlock', async (req, res) => {
           PartyA: tel,
           PartyB: MPESA_SHORTCODE,
           PhoneNumber: tel,
-          CallBackURL: CALLBACK_URL,
+          CallBackURL: getCallbackUrl(),
           AccountReference: (isBundle ? 'BNDL-' : 'LEAD-') + propertyId.slice(0, 8).toUpperCase(),
           TransactionDesc: `NestList Lead Unlock`,
         },

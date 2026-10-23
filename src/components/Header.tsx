@@ -44,7 +44,7 @@ export const Header: React.FC = () => {
   }, [profile, location.pathname, isLandlordRole]);
 
   // Check if current user has the admin privilege
-  const isAdmin = profile?.role === "admin" || profile?.role === "superadmin" || profile?.email === "gardisonkirui11@gmail.com" || profile?.email === "info@nestlist.co.ke" || profile?.email === "info@nestlist.com" || profile?.id === "42eca9a0-c070-4898-b830-46c3247ea71d" || profile?.id === "admin-1";
+  const isAdmin = profile?.role === "admin" || profile?.role === "superadmin";
 
   const handleSignOut = async () => {
     const { error } = await supabase.auth.signOut();

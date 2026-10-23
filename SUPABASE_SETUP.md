@@ -75,12 +75,12 @@ The "Simulator Mode" banner should disappear.
 3. Redeploy the app.
 
 ## Step 9 — Create Your Admin Account
-1. Register on the NestList app at `/signup` with your email (e.g., `gardisonkirui11@gmail.com`).
+1. Register on the NestList app at `/signup` with your email (e.g., `you@example.com`).
 2. Then run this SQL query in your Supabase SQL Editor:
 ```sql
 UPDATE profiles
 SET role = 'admin'
-WHERE email = 'gardisonkirui11@gmail.com';
+WHERE email = 'you@example.com';
 ```
 3. Log out and log back in.
 4. You now have admin access at `/admin`.
